@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green-dark:   #1B3A2D;
+            --green-mid:    #2D5A40;
+            --gold:         #B8972E;
+            --gold-light:   #F0D080;
+            --red:          #C0392B;
+            --gray-over:    #5A6472;
+            --bg:           #F4F4F0;
+            --border:       #D9D9CC;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: 'Barlow', sans-serif;
+            color: #1a1a1a;
+        }
+
+        /* ── Navbar ── */
+        .site-nav {
+            background: var(--green-dark);
+            border-bottom: 3px solid var(--gold);
+            padding: 0;
+        }
+        .site-nav .container {
+            display: flex;
+            align-items: stretch;
+            min-height: 56px;
+        }
+        .site-nav .brand {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: .04em;
+            color: #fff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+        }
+        .site-nav .brand span {
+            color: var(--gold-light);
+        }
+
+        /* ── Score colours ── */
+        .score-under { color: var(--red);      font-weight: 700; }
+        .score-over  { color: #1a1a1a; font-weight: 700; }
+        .score-even  { color: #1a1a1a;          font-weight: 600; }
+
+        /* ── Status badges ── */
+        .badge-status {
+            font-size: .65rem;
+            font-weight: 600;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: .25em .55em;
+            border-radius: 3px;
+        }
+        .badge-in_progress { background: #2D6A4F; color: #fff; }
+        .badge-completed   { background: #5A6472; color: #fff; }
+        .badge-scheduled   { background: #2C5F8A; color: #fff; }
+
+        /* ── Cards ── */
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        /* ── Leaderboard table ── */
+        .leaderboard thead th {
+            background: var(--green-dark);
+            color: var(--gold-light);
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: .8rem;
+            font-weight: 600;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            border: none;
+            padding: .6rem .75rem;
+            white-space: nowrap;
+        }
+        .leaderboard tbody tr {
+            border-bottom: 1px solid #EAEAE4;
+        }
+        .leaderboard tbody tr:hover {
+            background: #EFEFEA !important;
+        }
+        .leaderboard tbody td {
+            padding: .45rem .75rem;
+            font-size: .9rem;
+            vertical-align: middle;
+            border: none;
+        }
+        .leaderboard tbody tr:nth-child(odd) {
+            background: #fff;
+        }
+        .leaderboard tbody tr:nth-child(even) {
+            background: #F9F9F5;
+        }
+
+        /* ── Position column ── */
+        .pos-cell {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #555;
+            width: 48px;
+        }
+        .pos-1  { color: var(--gold); }
+        .pos-2, .pos-3 { color: #777; }
+
+        /* ── Player name link ── */
+        .player-link {
+            color: #1a1a1a;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .player-link:hover {
+            color: var(--green-mid);
+            text-decoration: underline;
+        }
+
+        /* ── Total score cell ── */
+        .total-cell {
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.05rem;
+        }
+
+        /* ── Pagination ── */
+        .pagination .page-link {
+            color: var(--green-dark);
+            border-color: var(--border);
+            font-size: .85rem;
+        }
+        .pagination .page-item.active .page-link {
+            background: var(--green-dark);
+            border-color: var(--green-dark);
+            color: var(--gold-light);
+            font-weight: 700;
+        }
+
+        /* ── Footer bar ── */
+        .footer-bar {
+            font-size: .78rem;
+            color: #888;
+            border-top: 1px solid var(--border);
+            margin-top: .75rem;
+            padding-top: .6rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="site-nav mb-4">
+        <div class="container">
+            <a class="brand" href="{% url 'golf:index' %}">⛳ <span>{{ APP_NAME }}</span></a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Timezone conversion
+        try {
+            document.querySelectorAll('[data-utc]').forEach(el => {
+                const d = new Date(el.dataset.utc);
+                el.textContent = d.toLocaleString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                    hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+                });
+            });
+        } catch (e) {
+            console.warn('Timezone conversion failed:', e);
+        }
+
+        // Auto-refresh
+        const pageTimestamp = document.querySelector('[data-utc]')?.dataset.utc || null;
+        const toggleBtn     = document.getElementById('refresh-toggle');
+        const intervalSel   = document.getElementById('refresh-interval');
+
+        if (pageTimestamp && toggleBtn && intervalSel) {
+            const params       = new URLSearchParams(window.location.search);
+            const tournamentId = params.get('tournament') || '';
+            let pollTimer      = null;
+
+            const isOn       = () => localStorage.getItem('autoRefresh') !== 'false';
+            const getInterval = () => parseInt(localStorage.getItem('refreshInterval') || '30', 10);
+
+            function applyUI() {
+                const on = isOn();
+                toggleBtn.textContent = on ? 'ON' : 'OFF';
+                toggleBtn.className   = 'btn btn-sm px-2 py-0 ' + (on ? 'btn-success' : 'btn-secondary');
+                intervalSel.disabled  = !on;
+                intervalSel.value     = String(getInterval());
+            }
+
+            async function poll() {
+                try {
+                    const url  = '/api/last-updated/' + (tournamentId ? '?tournament=' + tournamentId : '');
+                    const res  = await fetch(url);
+                    const data = await res.json();
+                    console.log('Poll — server:', data.last_updated, '| page:', pageTimestamp);
+                    if (data.last_updated && data.last_updated !== pageTimestamp) {
+                        console.log('New data detected, reloading...');
+                        location.reload();
+                    }
+                } catch (e) {
+                    console.warn('Poll failed:', e);
+                }
+            }
+
+            function startPolling() {
+                stopPolling();
+                if (isOn()) {
+                    const secs = getInterval();
+                    console.log(`Auto-refresh ON — polling every ${secs}s`);
+                    pollTimer = setInterval(poll, secs * 1000);
+                } else {
+                    console.log('Auto-refresh OFF');
+                }
+            }
+
+            function stopPolling() {
+                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            }
+
+            toggleBtn.addEventListener('click', () => {
+                localStorage.setItem('autoRefresh', isOn() ? 'false' : 'true');
+                applyUI();
+                startPolling();
+            });
+
+            intervalSel.addEventListener('change', () => {
+                localStorage.setItem('refreshInterval', intervalSel.value);
+                startPolling();
+            });
+
+            applyUI();
+            startPolling();
+        }
+    </script>
+</body>
+</html>

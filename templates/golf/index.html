@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tournament.name|default:"Leaderboard" }} — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+
+{% if tournament %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+    <div>
+        <h1 class="mb-0" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;letter-spacing:.02em;">
+            {{ tournament.name }}
+        </h1>
+        <span class="text-muted small me-2">{{ tournament.start_date|date:"M j" }} – {{ tournament.end_date|date:"M j, Y" }}</span>
+        <span class="badge-status badge-{{ tournament.status }}">{{ tournament.get_status_display }}</span>
+    </div>
+    <form method="get" class="d-flex align-items-center gap-2">
+        <label class="text-muted small mb-0 d-none d-sm-inline">Tournament</label>
+        <select name="tournament" class="form-select form-select-sm" style="min-width:220px" onchange="this.form.submit()">
+            {% for t in tournaments %}
+            <option value="{{ t.pk }}" {% if t.pk == tournament.pk %}selected{% endif %}>
+                {{ t.name }} ({{ t.season }})
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+{% endif %}
+
+{% if page.object_list %}
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table leaderboard mb-0">
+            <thead>
+                <tr>
+                    <th class="pos-cell">Pos</th>
+                    <th>Player</th>
+                    <th class="d-none d-md-table-cell">Country</th>
+                    {% if tournament.status == 'in_progress' %}
+                    <th class="text-center d-none d-md-table-cell">Thru</th>
+                    {% endif %}
+                    {% for rn in round_numbers %}
+                    <th class="text-center {% if not forloop.last %}d-none d-md-table-cell{% endif %}">R{{ rn }}</th>
+                    {% endfor %}
+                    <th class="text-center">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry, round_scores, thru in page.object_list %}
+                <tr>
+                    <td class="pos-cell {% if entry.position == '1' %}pos-1{% elif entry.position == '2' %}pos-2{% elif entry.position == '3' %}pos-3{% endif %}">
+                        {{ entry.position|default:"—" }}
+                    </td>
+                    <td>
+                        <a href="{% url 'golf:player_detail' entry.player.espn_id %}" class="player-link">
+                            {{ entry.player.display_name }}
+                        </a>
+                    </td>
+                    <td class="d-none d-md-table-cell text-muted small">{{ entry.player.country|default:"—" }}</td>
+
+                    {% if tournament.status == 'in_progress' %}
+                    <td class="text-center text-muted d-none d-md-table-cell small">
+                        {% if thru is None %}—{% elif thru == 18 %}F{% else %}{{ thru }}{% endif %}
+                    </td>
+                    {% endif %}
+
+                    {% for score in round_scores %}
+                    <td class="text-center small {% if not forloop.last %}d-none d-md-table-cell{% endif %}">
+                        {% if score %}
+                            {% if score.thru is not None and score.thru < 18 %}
+                                {% if score.score_to_par is None %}<span class="text-muted">—</span>
+                                {% elif score.score_to_par < 0 %}<span class="score-under">{{ score.score_to_par }}</span>
+                                {% elif score.score_to_par > 0 %}<span class="score-over">+{{ score.score_to_par }}</span>
+                                {% else %}<span class="score-even">E</span>
+                                {% endif %}
+                            {% else %}
+                                {% if score.score_to_par is not None and score.score_to_par < 0 %}<span class="score-under">{{ score.strokes }}</span>
+                                {% elif score.score_to_par is not None and score.score_to_par > 0 %}<span class="score-over">{{ score.strokes }}</span>
+                                {% elif score.score_to_par == 0 %}<span class="score-even">{{ score.strokes }}</span>
+                                {% else %}{{ score.strokes|default:"—" }}
+                                {% endif %}
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+
+                    <td class="text-center total-cell">
+                        {% if entry.total_score_to_par is None %}<span class="text-muted">—</span>
+                        {% elif entry.total_score_to_par < 0 %}<span class="score-under">{{ entry.total_score_to_par }}</span>
+                        {% elif entry.total_score_to_par > 0 %}<span class="score-over">+{{ entry.total_score_to_par }}</span>
+                        {% else %}<span class="score-even">E</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center">
+        {% if page.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}page={{ page.previous_page_number }}">&#8592; Prev</a>
+        </li>
+        {% endif %}
+        {% for num in page.paginator.page_range %}
+        <li class="page-item {% if num == page.number %}active{% endif %}">
+            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}page={{ num }}">{{ num }}</a>
+        </li>
+        {% endfor %}
+        {% if page.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}page={{ page.next_page_number }}">Next &#8594;</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<div class="footer-bar d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <span>
+        {{ page.paginator.count }} player{{ page.paginator.count|pluralize }}
+        {% if last_updated %}
+        &nbsp;·&nbsp; Updated <span data-utc="{{ last_updated|date:'c' }}">{{ last_updated|date:"N j, Y, g:i a" }} UTC</span>
+        {% endif %}
+    </span>
+    {% if last_updated %}
+    <div class="d-flex align-items-center gap-2">
+        <span class="d-none d-sm-inline">Auto-refresh</span>
+        <button id="refresh-toggle" class="btn btn-sm px-2 py-0"></button>
+        <select id="refresh-interval" class="form-select form-select-sm" style="width:auto">
+            <option value="30">30s</option>
+            <option value="60">1m</option>
+            <option value="120">2m</option>
+            <option value="300">5m</option>
+        </select>
+    </div>
+    {% endif %}
+</div>
+
+{% else %}
+<div class="alert alert-secondary mt-3">
+    No leaderboard data yet. Run <code>python manage.py scrape_pga</code> to fetch data.
+</div>
+{% endif %}
+
+{% endblock %}

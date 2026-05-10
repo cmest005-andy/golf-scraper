@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ player.display_name }} — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+
+<div class="mb-3">
+    <a href="javascript:history.back()" class="text-muted small">&#8592; Back</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <img src="{{ player.headshot }}"
+                     alt="{{ player.display_name }}"
+                     class="rounded"
+                     style="width:100px;height:100px;object-fit:cover;"
+                     onerror="this.style.display='none'">
+            </div>
+            <div class="col">
+                <h2 class="mb-0">{{ player.display_name }}</h2>
+                <p class="text-muted mb-1">{{ player.country }}</p>
+                {% if player.world_ranking %}
+                <span class="badge bg-dark">World Ranking #{{ player.world_ranking }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if player.wiki_bio %}
+        <p class="mt-3 mb-0">{{ player.wiki_bio }}</p>
+        {% elif player.bio_note %}
+        <p class="mt-3 mb-0 text-muted">{{ player.bio_note }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    {% if player.birthdate %}
+    <div class="col-6 col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Born</div>
+                <div class="fw-bold">{{ player.birthdate|date:"M j, Y" }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if player.birthplace %}
+    <div class="col-6 col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Birthplace</div>
+                <div class="fw-bold">{{ player.birthplace }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if player.height %}
+    <div class="col-6 col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Height</div>
+                <div class="fw-bold">{{ player.height }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if player.weight %}
+    <div class="col-6 col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Weight</div>
+                <div class="fw-bold">{{ player.weight }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if player.turned_pro %}
+    <div class="col-6 col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Turned Pro</div>
+                <div class="fw-bold">{{ player.turned_pro }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if player.earnings %}
+    <div class="col-6 col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">Season Earnings</div>
+                <div class="fw-bold">${{ player.earnings|floatformat:0|intcomma }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if player.fedex_points %}
+    <div class="col-6 col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body py-3">
+                <div class="text-muted small">FedEx Points</div>
+                <div class="fw-bold">{{ player.fedex_points }}</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if recent_scores %}
+<h5 class="mb-3">Recent Scores</h5>
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Tournament</th>
+                    <th class="text-center">Round</th>
+                    <th class="text-center">Strokes</th>
+                    <th class="text-center">Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for score in recent_scores %}
+                <tr>
+                    <td>{{ score.tournament.name }}</td>
+                    <td class="text-center">R{{ score.round.round_number }}</td>
+                    <td class="text-center">{{ score.strokes|default:"—" }}</td>
+                    <td class="text-center">
+                        {% if score.score_to_par is None %}
+                            <span class="text-muted">—</span>
+                        {% elif score.score_to_par < 0 %}
+                            <span class="score-under">{{ score.score_to_par }}</span>
+                        {% elif score.score_to_par > 0 %}
+                            <span class="score-over">+{{ score.score_to_par }}</span>
+                        {% else %}
+                            <span class="score-even">E</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

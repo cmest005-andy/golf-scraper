@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}My Leagues — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">My Leagues</h1>
+    <div class="d-flex gap-2">
+        <a href="{% url 'fantasy:join_league' %}" class="btn btn-sm btn-outline-secondary">Join League</a>
+        <a href="{% url 'fantasy:create_league' %}" class="btn btn-sm" style="background:var(--green-dark);color:#fff;">+ Create League</a>
+    </div>
+</div>
+
+{% if leagues %}
+<div class="row g-3">
+    {% for league in leagues %}
+    <div class="col-md-6 col-lg-4">
+        <a href="{% url 'fantasy:league_detail' league.pk %}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm" style="transition:box-shadow .15s;">
+                <div class="card-body">
+                    <h5 class="mb-1" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--green-dark);">
+                        {{ league.name }}
+                    </h5>
+                    <p class="text-muted small mb-2">
+                        {{ league.memberships.count }} member{{ league.memberships.count|pluralize }}
+                        &nbsp;·&nbsp; {{ league.roster_size }} picks/week
+                    </p>
+                    {% if league.commissioner == request.user %}
+                    <span class="badge-status badge-in_progress">Commissioner</span>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-secondary">
+    You're not in any leagues yet. <a href="{% url 'fantasy:create_league' %}">Create one</a> or <a href="{% url 'fantasy:join_league' %}">join with an invite code</a>.
+</div>
+{% endif %}
+{% endblock %}

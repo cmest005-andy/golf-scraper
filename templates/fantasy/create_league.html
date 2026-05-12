@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Create League — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-sm-8 col-md-6 col-lg-4">
+        <h1 class="mb-4" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">Create League</h1>
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                {% if error %}
+                <div class="alert alert-danger py-2 small">{{ error }}</div>
+                {% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">League Name</label>
+                        <input type="text" name="name" class="form-control form-control-sm" value="{{ request.POST.name }}" autofocus>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold">Picks per team per week</label>
+                        <input type="number" name="roster_size" class="form-control form-control-sm" value="{{ request.POST.roster_size|default:6 }}" min="1" max="20">
+                        <div class="form-text text-muted" style="font-size:.75rem;">How many golfers each member drafts each tournament.</div>
+                    </div>
+                    <button type="submit" class="btn btn-sm w-100" style="background:var(--green-dark);color:#fff;">Create League</button>
+                </form>
+            </div>
+        </div>
+        <p class="text-center text-muted small mt-3">
+            <a href="{% url 'fantasy:my_leagues' %}">← Back to My Leagues</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

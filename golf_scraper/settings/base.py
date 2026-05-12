@@ -4,6 +4,7 @@ from decouple import config, Csv
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = config('SECRET_KEY')
+THE_ODDS_API_KEY = config('THE_ODDS_API_KEY', default='')
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 
@@ -15,8 +16,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'golf',
+    'users',
+    'fantasy',
     'django.contrib.humanize',
 ]
+
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/scorecard/'
+LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -64,12 +71,13 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/New_York'
 USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -83,7 +91,8 @@ LOGGING = {
         'console': {'class': 'logging.StreamHandler'},
     },
     'loggers': {
-        'golf': {'handlers': ['console'], 'level': 'INFO'},
-        'apscheduler': {'handlers': ['console'], 'level': 'INFO'},
+        'golf':     {'handlers': ['console'], 'level': 'INFO'},
+        'fantasy':  {'handlers': ['console'], 'level': 'INFO'},
+        'apscheduler': {'handlers': ['console'], 'level': 'WARNING'},
     },
 }

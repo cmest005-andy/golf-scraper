@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 from django.core.paginator import Paginator
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.db.models.expressions import RawSQL
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -12,6 +12,10 @@ from .models import Leaderboard, Player, PlayerScore, Tournament, TournamentRoun
 from .scraper.espn import fetch_player_bio, fetch_wikipedia_bio
 
 logger = logging.getLogger(__name__)
+
+
+def home(request):
+    return render(request, 'golf/home.html')
 
 
 def index(request):
@@ -26,6 +30,7 @@ def index(request):
             or tournaments.first()
         )
 
+    search = request.GET.get('search', '').strip()
     leaderboard_data = []
     round_numbers = []
 
@@ -52,11 +57,18 @@ def index(request):
             .order_by('total_score_to_par', 'pos_int')
         )
 
+        if search:
+            leaderboard = leaderboard.filter(
+                Q(player__display_name__istartswith=search) |
+                Q(player__display_name__icontains=' ' + search)
+            )
+
         for entry in leaderboard:
-            round_scores = [score_map.get((entry.player_id, rn)) for rn in round_numbers]
-            latest = next((s for s in reversed(round_scores) if s is not None and s.thru is not None), None)
+            round_score_list = [score_map.get((entry.player_id, rn)) for rn in round_numbers]
+            latest = next((s for s in reversed(round_score_list) if s is not None and s.thru is not None), None)
             thru = latest.thru if latest else None
-            leaderboard_data.append((entry, round_scores, thru))
+            round_score_pairs = [(rn, score_map.get((entry.player_id, rn))) for rn in round_numbers]
+            leaderboard_data.append((entry, round_score_pairs, thru))
 
     paginator = Paginator(leaderboard_data, 10)
     page = paginator.get_page(request.GET.get('page'))
@@ -67,6 +79,16 @@ def index(request):
             latest=Max('last_updated')
         )['latest']
 
+    player_names = []
+    if tournament:
+        player_names = list(
+            Leaderboard.objects
+            .filter(tournament=tournament)
+            .select_related('player')
+            .order_by('player__display_name')
+            .values_list('player__display_name', flat=True)
+        )
+
     return render(request, 'golf/index.html', {
         'last_updated_iso': last_updated.isoformat() if last_updated else '',
         'tournament': tournament,
@@ -74,6 +96,8 @@ def index(request):
         'page': page,
         'round_numbers': round_numbers,
         'last_updated': last_updated,
+        'search': search,
+        'player_names': player_names,
     })
 
 
@@ -130,16 +154,117 @@ def player_detail(request, espn_id):
         except Exception:
             logger.exception('Failed to fetch Wikipedia bio for player %s', espn_id)
 
-    recent_scores = (
-        PlayerScore.objects
+    leaderboard_entries = (
+        Leaderboard.objects
         .filter(player=player)
-        .select_related('tournament', 'round')
-        .order_by('-tournament__start_date', 'round__round_number')[:20]
+        .select_related('tournament')
+        .order_by('-tournament__start_date')
     )
+
+    score_map = {
+        (s.tournament_id, s.round.round_number): s
+        for s in PlayerScore.objects
+            .filter(player=player)
+            .select_related('round')
+    }
+
+    rounds_by_tournament = {}
+    for rn_obj in (
+        TournamentRound.objects
+        .filter(tournament__in=[e.tournament_id for e in leaderboard_entries], round_number__lte=4)
+        .order_by('round_number')
+    ):
+        rounds_by_tournament.setdefault(rn_obj.tournament_id, []).append(rn_obj.round_number)
+
+    max_rounds = max((len(v) for v in rounds_by_tournament.values()), default=4)
+
+    recent_results = []
+    for entry in leaderboard_entries:
+        tid = entry.tournament_id
+        round_numbers = rounds_by_tournament.get(tid, [])
+        round_scores = [score_map.get((tid, rn)) for rn in round_numbers]
+        # Pad to max_rounds so columns align
+        while len(round_scores) < max_rounds:
+            round_scores.append(None)
+        recent_results.append((entry, round_scores))
+
+    round_columns = list(range(1, max_rounds + 1))
 
     return render(request, 'golf/player_detail.html', {
         'player': player,
-        'recent_scores': recent_scores,
+        'recent_results': recent_results,
+        'round_columns': round_columns,
+    })
+
+
+def leaderboard_api(request):
+    tournament_id = request.GET.get('tournament')
+
+    if tournament_id:
+        tournament = get_object_or_404(Tournament, pk=tournament_id)
+    else:
+        tournament = (
+            Tournament.objects.filter(status=Tournament.Status.IN_PROGRESS).first()
+            or Tournament.objects.order_by('-start_date').first()
+        )
+
+    if not tournament:
+        return JsonResponse({'last_updated': None, 'players': [], 'round_numbers': []})
+
+    round_numbers = list(
+        TournamentRound.objects
+        .filter(tournament=tournament)
+        .order_by('round_number')
+        .values_list('round_number', flat=True)
+    )
+
+    score_map = {
+        (s.player_id, s.round.round_number): s
+        for s in PlayerScore.objects
+            .filter(tournament=tournament)
+            .select_related('round')
+    }
+
+    leaderboard = (
+        Leaderboard.objects
+        .filter(tournament=tournament)
+        .select_related('player')
+        .annotate(pos_int=RawSQL("CAST(NULLIF(position, '') AS INTEGER)", []))
+        .order_by('total_score_to_par', 'pos_int')
+    )
+
+    players = []
+    for entry in leaderboard:
+        round_score_list = [score_map.get((entry.player_id, rn)) for rn in round_numbers]
+        latest = next((s for s in reversed(round_score_list) if s is not None and s.thru is not None), None)
+        thru = latest.thru if latest else None
+
+        rounds = []
+        for rn, score in zip(round_numbers, round_score_list):
+            rounds.append({
+                'round_number': rn,
+                'strokes': score.strokes if score else None,
+                'score_to_par': score.score_to_par if score else None,
+                'thru': score.thru if score else None,
+            })
+
+        players.append({
+            'player_id': entry.player.espn_id,
+            'position': entry.position or '',
+            'total_score_to_par': entry.total_score_to_par,
+            'thru': thru,
+            'rounds': rounds,
+        })
+
+    last_updated = Leaderboard.objects.filter(tournament=tournament).aggregate(
+        latest=Max('last_updated')
+    )['latest']
+
+    return JsonResponse({
+        'last_updated': last_updated.isoformat() if last_updated else None,
+        'tournament_status': tournament.status,
+        'round_numbers': round_numbers,
+        'players': players,
     })
 
 

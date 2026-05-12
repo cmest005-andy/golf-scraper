@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Account Settings — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-sm-8 col-md-5 col-lg-4">
+        <div class="card shadow-sm mt-4">
+            <div class="card-body p-4">
+                <h4 class="mb-1" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;">Account Settings</h4>
+                <p class="text-muted small mb-4">Signed in as <strong>{{ user.username }}</strong></p>
+
+                {% if saved %}
+                <div class="alert alert-success py-2 small">Display name updated.</div>
+                {% endif %}
+                {% if error %}
+                <div class="alert alert-danger py-2 small">{{ error }}</div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Display Name</label>
+                        <input type="text" name="display_name" class="form-control form-control-sm"
+                               value="{{ profile.display_name }}" maxlength="100"
+                               placeholder="{{ user.username }}">
+                        <div class="form-text text-muted" style="font-size:.75rem;">Shown instead of your username across the app. Leave blank to use your username.</div>
+                    </div>
+                    <button type="submit" class="btn btn-sm w-100" style="background:var(--green-dark);color:#fff;">Save</button>
+                </form>
+            </div>
+        </div>
+        <p class="text-center text-muted small mt-3">
+            <a href="{% url 'fantasy:my_leagues' %}">← My Leagues</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

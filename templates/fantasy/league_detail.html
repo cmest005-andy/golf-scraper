@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% load fantasy_tags %}
+{% block title %}{{ league.name }} — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="mb-0" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">{{ league.name }}</h1>
+        <span class="text-muted small">{{ members.count }} member{{ members.count|pluralize }} &nbsp;·&nbsp; {{ league.roster_size }} picks</span>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'fantasy:team_detail' league.pk my_membership.pk %}" class="btn btn-sm btn-outline-secondary">My Team</a>
+        {% if is_commissioner %}
+        {% if can_create_draft %}
+        <a href="{% url 'fantasy:create_draft' league.pk %}" class="btn btn-sm" style="background:var(--green-dark);color:#fff;">Set Draft</a>
+        {% endif %}
+        <a href="{% url 'fantasy:league_settings' league.pk %}" class="btn btn-sm btn-outline-secondary">Settings</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if active_draft %}
+<div class="alert mb-4 py-2 px-3 d-flex align-items-center justify-content-between gap-3"
+     style="background:#e8f5e9;border:1.5px solid var(--green-dark);border-radius:.5rem;">
+    <div class="d-flex align-items-center gap-2">
+        <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#e74c3c;animation:livepulse 1.4s ease-in-out infinite;flex-shrink:0;"></span>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.05rem;color:var(--green-dark);">
+            Draft in Progress &mdash; {{ active_draft.tournament.name }}
+        </span>
+    </div>
+    <a href="{% url 'fantasy:draft_room' active_draft.pk %}" class="btn btn-sm" style="background:var(--green-dark);color:#fff;white-space:nowrap;">
+        Enter Draft Lobby
+    </a>
+</div>
+<style>
+@keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+</style>
+{% endif %}
+
+<div class="row g-4">
+
+    <!-- Members -->
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h6 class="mb-3" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--green-dark);">Members</h6>
+                <ul class="list-unstyled mb-0">
+                    {% for m in members %}
+                    <li class="d-flex align-items-center justify-content-between py-1 border-bottom">
+                        <span class="small fw-semibold">{{ m.display }}</span>
+                        {% if m.user == league.commissioner %}
+                        <span class="badge-status badge-in_progress" style="font-size:.6rem;">Commissioner</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Invite code — hidden once any draft has started -->
+        {% if show_invite_code %}
+        <div class="card shadow-sm mt-3">
+            <div class="card-body">
+                <h6 class="mb-2" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--green-dark);">Invite Code</h6>
+                <p class="mb-1" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;letter-spacing:.15em;color:var(--gold);">{{ league.invite_code }}</p>
+                <p class="text-muted small mb-0">Share this code with friends to join the league.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Drafts -->
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h6 class="mb-3" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--green-dark);">Weekly Drafts</h6>
+                {% if drafts %}
+                <ul class="list-unstyled mb-0">
+                    {% for draft in drafts %}
+                    {% with meta=draft_meta|dictlookup:draft.pk %}
+                    <li class="py-2 border-bottom">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div>
+                                <div class="fw-semibold">{{ draft.tournament.name }}</div>
+                                <div class="text-muted small">{{ draft.tournament.start_date|date:"M j" }} – {{ draft.tournament.end_date|date:"M j, Y" }}</div>
+                                <div class="small mt-1">
+                                    <span class="text-muted">Draft Date:</span>
+                                    {% if draft.draft_time %}
+                                    <span style="color:var(--gold);">{{ draft.draft_time|date:"N j, Y g:i A" }}</span>
+                                    {% if is_commissioner %}<a href="{% url 'fantasy:set_draft_time' draft.pk %}" class="ms-1 text-muted" style="font-size:.7rem;">Edit</a>{% endif %}
+                                    {% else %}
+                                    <span class="text-muted">TBD</span>
+                                    {% if is_commissioner %}<a href="{% url 'fantasy:set_draft_time' draft.pk %}" class="ms-1 text-muted" style="font-size:.7rem;">Set</a>{% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="d-flex flex-column align-items-end gap-2">
+                                <span class="badge-status badge-{% if draft.status == 'open' %}in_progress{% elif draft.status == 'locked' %}completed{% else %}scheduled{% endif %}">
+                                    {{ draft.get_status_display }}
+                                </span>
+                                {% if draft.status != 'scheduled' %}
+                                <a href="{% url 'fantasy:draft_standings' draft.pk %}" class="btn btn-sm btn-outline-secondary">Team Scorecard</a>
+                                {% endif %}
+                                {% if draft.status == 'open' and draft.draft_time and meta.is_draft_day and not meta.draft_started %}
+                                    {% if meta.lobby_is_open %}
+                                    <a href="{% url 'fantasy:draft_room' draft.pk %}" class="btn btn-sm" style="background:var(--green-dark);color:#fff;">Open Draft Lobby</a>
+                                    {% else %}
+                                    <span data-bs-toggle="tooltip" data-bs-placement="left" title="Lobby opens at {{ meta.lobby_open_time|date:'g:i A' }}">
+                                        <button class="btn btn-sm btn-outline-secondary" disabled style="pointer-events:none;">Open Draft Lobby</button>
+                                    </span>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% with teams=draft_rosters|dictlookup:draft.pk %}
+                        {% if teams %}
+                        <div class="row g-2 mt-2">
+                            {% for team in teams %}
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="p-2 rounded team-roster-card"
+                                     style="background:#f8f9fa;border:1px solid #e9ecef;transition:border-color .3s,background .3s;"
+                                     {% if active_draft and draft.pk == active_draft.pk %}data-member-id="{{ team.member.pk }}"{% endif %}>
+                                    <div class="fw-semibold small d-flex align-items-center gap-1" style="font-family:'Barlow Condensed',sans-serif;color:var(--green-dark);">
+                                        {% if active_draft and draft.pk == active_draft.pk %}
+                                        <span class="otc-dot" style="display:none;width:7px;height:7px;border-radius:50%;background:#e74c3c;flex-shrink:0;animation:livepulse 1.4s ease-in-out infinite;"></span>
+                                        {% endif %}
+                                        {{ team.member.display }}
+                                    </div>
+                                    <table class="w-100 mt-1" style="font-size:.72rem;border-collapse:collapse;">
+                                        <tbody class="pick-rows">
+                                        {% for pick in team.picks %}
+                                        <tr>
+                                            <td class="text-truncate" style="max-width:0;width:100%;padding:1px 0;">{{ pick.player.display_name }}</td>
+                                            <td class="text-end ps-2 fw-semibold" style="white-space:nowrap;padding:1px 0;">
+                                                {% if pick.score_to_par is not None %}
+                                                    {% if pick.score_to_par < 0 %}<span style="color:#27ae60;">{{ pick.score_to_par }}</span>
+                                                    {% elif pick.score_to_par > 0 %}<span style="color:#e74c3c;">+{{ pick.score_to_par }}</span>
+                                                    {% else %}<span class="text-muted">E</span>{% endif %}
+                                                {% else %}<span class="text-muted">—</span>{% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    <div class="mt-1 pt-1 fw-bold text-end" style="font-size:.75rem;border-top:1px solid #dee2e6;font-family:'Barlow Condensed',sans-serif;">
+                                        {% if team.team_score is not None %}
+                                            {% if team.team_score < 0 %}<span style="color:#27ae60;">{{ team.team_score }}</span>
+                                            {% elif team.team_score > 0 %}<span style="color:#e74c3c;">+{{ team.team_score }}</span>
+                                            {% else %}<span class="text-muted">E</span>{% endif %}
+                                        {% else %}<span class="text-muted">—</span>{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </li>
+                    {% endwith %}
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small mb-0">No drafts yet.{% if is_commissioner %} Click <strong>Set Draft</strong> to schedule one for the current tournament.{% endif %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+});
+
+{% if active_draft %}
+(function () {
+    const POLL_URL  = "{% url 'fantasy:draft_state_api' active_draft.pk %}";
+    let lastPicks   = {{ active_draft_total_picks }};
+
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function updateCards(picks, otcMemberId) {
+        // Group picks by member_id
+        const byMember = {};
+        picks.forEach(p => {
+            if (!byMember[p.member_id]) byMember[p.member_id] = [];
+            byMember[p.member_id].push(p);
+        });
+
+        document.querySelectorAll('[data-member-id]').forEach(card => {
+            const mid        = parseInt(card.dataset.memberId);
+            const isOtc      = mid === otcMemberId;
+            const memberPicks = byMember[mid] || [];
+            const tbody      = card.querySelector('.pick-rows');
+            const dot        = card.querySelector('.otc-dot');
+
+            // Highlight on-the-clock card
+            card.style.borderColor = isOtc ? 'var(--green-dark)' : '#e9ecef';
+            card.style.background  = isOtc ? '#e8f5e9' : '#f8f9fa';
+            if (dot) dot.style.display = isOtc ? 'inline-block' : 'none';
+
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            memberPicks.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td class="text-truncate" style="max-width:0;width:100%;padding:1px 0;">' + esc(p.player__display_name) + '</td>' +
+                    '<td class="text-end ps-2 fw-semibold text-muted" style="white-space:nowrap;padding:1px 0;">—</td>';
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    function poll() {
+        fetch(POLL_URL, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(r => r.json())
+            .then(data => {
+                if (data.total_picks !== lastPicks) {
+                    lastPicks = data.total_picks;
+                    updateCards(data.picks, data.on_the_clock_member_id);
+                } else if (data.on_the_clock_member_id !== null) {
+                    // Keep highlight current even when no new pick
+                    document.querySelectorAll('[data-member-id]').forEach(card => {
+                        const isOtc = parseInt(card.dataset.memberId) === data.on_the_clock_member_id;
+                        const dot   = card.querySelector('.otc-dot');
+                        card.style.borderColor = isOtc ? 'var(--green-dark)' : '#e9ecef';
+                        card.style.background  = isOtc ? '#e8f5e9' : '#f8f9fa';
+                        if (dot) dot.style.display = isOtc ? 'inline-block' : 'none';
+                    });
+                }
+                if (data.status !== 'locked') setTimeout(poll, 3000);
+            })
+            .catch(() => setTimeout(poll, 5000));
+    }
+
+    poll();
+})();
+{% endif %}
+</script>
+{% endblock %}
+{% endblock %}

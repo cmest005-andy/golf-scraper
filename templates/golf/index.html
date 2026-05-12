@@ -11,10 +11,29 @@
             {{ tournament.name }}
         </h1>
         <span class="text-muted small me-2">{{ tournament.start_date|date:"M j" }} – {{ tournament.end_date|date:"M j, Y" }}</span>
+        {% if tournament.course %}<span class="text-muted small me-2">· {{ tournament.course.name }}</span>{% endif %}
         <span class="badge-status badge-{{ tournament.status }}">{{ tournament.get_status_display }}</span>
     </div>
-    <form method="get" class="d-flex align-items-center gap-2">
-        <label class="text-muted small mb-0 d-none d-sm-inline">Tournament</label>
+    <form method="get" class="d-flex flex-wrap align-items-center gap-2">
+        {% if request.GET.tournament %}
+        <input type="hidden" name="tournament" value="{{ request.GET.tournament }}">
+        {% endif %}
+        <div class="position-relative" style="min-width:160px;max-width:220px">
+            <input type="search"
+                   id="player-search"
+                   name="search"
+                   value="{{ search }}"
+                   placeholder="Search player…"
+                   class="form-control form-control-sm"
+                   autocomplete="off">
+            <ul id="player-ac" class="list-unstyled position-absolute bg-white border rounded shadow-sm mb-0 w-100"
+                style="top:100%;left:0;z-index:1000;max-height:220px;overflow-y:auto;display:none;font-size:.875rem;"></ul>
+        </div>
+        {{ player_names|json_script:"player-names-data" }}
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Go</button>
+        {% if search %}
+        <a href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}{% endif %}" class="btn btn-sm btn-outline-danger">✕</a>
+        {% endif %}
         <select name="tournament" class="form-select form-select-sm" style="min-width:220px" onchange="this.form.submit()">
             {% for t in tournaments %}
             <option value="{{ t.pk }}" {% if t.pk == tournament.pk %}selected{% endif %}>
@@ -29,7 +48,13 @@
 {% if page.object_list %}
 <div class="card shadow-sm">
     <div class="table-responsive">
-        <table class="table leaderboard mb-0">
+        <table class="table leaderboard mb-0"
+               data-tournament-id="{{ tournament.pk }}"
+               data-tournament-status="{{ tournament.status }}"
+               data-round-numbers="{{ round_numbers|join:',' }}"
+               data-page="{{ page.number }}"
+               data-page-size="10"
+               data-last-updated="{{ last_updated|date:'c' }}">
             <thead>
                 <tr>
                     <th class="pos-cell">Pos</th>
@@ -46,8 +71,9 @@
             </thead>
             <tbody>
                 {% for entry, round_scores, thru in page.object_list %}
-                <tr>
-                    <td class="pos-cell {% if entry.position == '1' %}pos-1{% elif entry.position == '2' %}pos-2{% elif entry.position == '3' %}pos-3{% endif %}">
+                <tr data-player-id="{{ entry.player.espn_id }}">
+                    <td class="pos-cell {% if entry.position == '1' %}pos-1{% elif entry.position == '2' %}pos-2{% elif entry.position == '3' %}pos-3{% endif %}"
+                        data-field="position">
                         {{ entry.position|default:"—" }}
                     </td>
                     <td>
@@ -58,13 +84,14 @@
                     <td class="d-none d-md-table-cell text-muted small">{{ entry.player.country|default:"—" }}</td>
 
                     {% if tournament.status == 'in_progress' %}
-                    <td class="text-center text-muted d-none d-md-table-cell small">
+                    <td class="text-center text-muted d-none d-md-table-cell small" data-field="thru">
                         {% if thru is None %}—{% elif thru == 18 %}F{% else %}{{ thru }}{% endif %}
                     </td>
                     {% endif %}
 
-                    {% for score in round_scores %}
-                    <td class="text-center small {% if not forloop.last %}d-none d-md-table-cell{% endif %}">
+                    {% for rn, score in round_scores %}
+                    <td class="text-center small {% if not forloop.last %}d-none d-md-table-cell{% endif %}"
+                        data-field="round-{{ rn }}">
                         {% if score %}
                             {% if score.thru is not None and score.thru < 18 %}
                                 {% if score.score_to_par is None %}<span class="text-muted">—</span>
@@ -85,7 +112,7 @@
                     </td>
                     {% endfor %}
 
-                    <td class="text-center total-cell">
+                    <td class="text-center total-cell" data-field="total">
                         {% if entry.total_score_to_par is None %}<span class="text-muted">—</span>
                         {% elif entry.total_score_to_par < 0 %}<span class="score-under">{{ entry.total_score_to_par }}</span>
                         {% elif entry.total_score_to_par > 0 %}<span class="score-over">+{{ entry.total_score_to_par }}</span>
@@ -104,17 +131,17 @@
     <ul class="pagination pagination-sm justify-content-center">
         {% if page.has_previous %}
         <li class="page-item">
-            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}page={{ page.previous_page_number }}">&#8592; Prev</a>
+            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}{% if search %}search={{ search }}&{% endif %}page={{ page.previous_page_number }}">&#8592; Prev</a>
         </li>
         {% endif %}
         {% for num in page.paginator.page_range %}
         <li class="page-item {% if num == page.number %}active{% endif %}">
-            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}page={{ num }}">{{ num }}</a>
+            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}{% if search %}search={{ search }}&{% endif %}page={{ num }}">{{ num }}</a>
         </li>
         {% endfor %}
         {% if page.has_next %}
         <li class="page-item">
-            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}page={{ page.next_page_number }}">Next &#8594;</a>
+            <a class="page-link" href="?{% if request.GET.tournament %}tournament={{ request.GET.tournament }}&{% endif %}{% if search %}search={{ search }}&{% endif %}page={{ page.next_page_number }}">Next &#8594;</a>
         </li>
         {% endif %}
     </ul>
@@ -124,20 +151,15 @@
 <div class="footer-bar d-flex align-items-center justify-content-between flex-wrap gap-2">
     <span>
         {{ page.paginator.count }} player{{ page.paginator.count|pluralize }}
+        {% if search %}<span class="text-muted">matching "{{ search }}"</span>{% endif %}
         {% if last_updated %}
         &nbsp;·&nbsp; Updated <span data-utc="{{ last_updated|date:'c' }}">{{ last_updated|date:"N j, Y, g:i a" }} UTC</span>
         {% endif %}
     </span>
-    {% if last_updated %}
+    {% if last_updated and not search %}
     <div class="d-flex align-items-center gap-2">
         <span class="d-none d-sm-inline">Auto-refresh</span>
         <button id="refresh-toggle" class="btn btn-sm px-2 py-0"></button>
-        <select id="refresh-interval" class="form-select form-select-sm" style="width:auto">
-            <option value="30">30s</option>
-            <option value="60">1m</option>
-            <option value="120">2m</option>
-            <option value="300">5m</option>
-        </select>
     </div>
     {% endif %}
 </div>
@@ -147,5 +169,74 @@
     No leaderboard data yet. Run <code>python manage.py scrape_pga</code> to fetch data.
 </div>
 {% endif %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const input  = document.getElementById('player-search');
+    const list   = document.getElementById('player-ac');
+    const data   = document.getElementById('player-names-data');
+    if (!input || !list || !data) return;
+
+    const allNames = JSON.parse(data.textContent);
+    let activeIdx  = -1;
+
+    function wordMatch(name, term) {
+        const n = name.toLowerCase(), t = term.toLowerCase();
+        return n.startsWith(t) || n.includes(' ' + t);
+    }
+
+    function show(matches) {
+        list.innerHTML = '';
+        activeIdx = -1;
+        if (!matches.length) { list.style.display = 'none'; return; }
+        matches.forEach(name => {
+            const li = document.createElement('li');
+            li.textContent = name;
+            li.style.cssText = 'padding:.3rem .65rem;cursor:pointer;';
+            li.addEventListener('mousedown', () => {
+                input.value = name;
+                list.style.display = 'none';
+                input.closest('form').submit();
+            });
+            li.addEventListener('mouseover', () => setActive(li));
+            list.appendChild(li);
+        });
+        list.style.display = 'block';
+    }
+
+    function setActive(li) {
+        [...list.children].forEach(el => el.style.background = '');
+        if (li) { li.style.background = '#f0efe8'; activeIdx = [...list.children].indexOf(li); }
+    }
+
+    input.addEventListener('input', () => {
+        const term = input.value.trim();
+        show(term.length >= 1 ? allNames.filter(n => wordMatch(n, term)).slice(0, 10) : []);
+    });
+
+    input.addEventListener('keydown', e => {
+        const items = [...list.children];
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActive(items[Math.min(activeIdx + 1, items.length - 1)]);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActive(items[Math.max(activeIdx - 1, 0)]);
+        } else if (e.key === 'Enter' && activeIdx >= 0) {
+            e.preventDefault();
+            input.value = items[activeIdx].textContent;
+            list.style.display = 'none';
+            input.closest('form').submit();
+        } else if (e.key === 'Escape') {
+            list.style.display = 'none';
+        }
+    });
+
+    input.addEventListener('blur', () => setTimeout(() => list.style.display = 'none', 150));
+    input.addEventListener('focus', () => { if (input.value.trim()) input.dispatchEvent(new Event('input')); });
+})();
+</script>
+{% endblock %}
 
 {% endblock %}

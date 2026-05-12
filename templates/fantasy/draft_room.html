@@ -1,0 +1,535 @@
+{% extends "base.html" %}
+{% load fantasy_tags %}
+{% block title %}Draft — {{ draft.tournament.name }} — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+    <div>
+        <a href="{% url 'fantasy:league_detail' league.pk %}" class="text-muted small" style="text-decoration:none;">&#8592; {{ league.name }}</a>
+        <h1 class="mb-0" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">
+            {{ draft.tournament.name }} Draft
+        </h1>
+        <span class="text-muted small">{{ draft.tournament.start_date|date:"M j" }}–{{ draft.tournament.end_date|date:"M j, Y" }}</span>
+        {% if draft.draft_time and not draft_started %}
+        <span class="text-muted small">⏰ <strong style="color:var(--gold);" id="draft-countdown"></strong> &nbsp;·&nbsp; {{ draft.draft_time|date:"N j, Y g:i A" }}</span>
+        {% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge-status badge-{% if draft.status == 'open' %}in_progress{% elif draft.status == 'locked' %}completed{% else %}scheduled{% endif %}">
+            {{ draft.get_status_display }}
+        </span>
+        {% if draft.status == 'open' and not draft_complete %}
+        <span id="live-dot" title="Live" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e74c3c;animation:livepulse 1.4s ease-in-out infinite;"></span>
+        {% endif %}
+        {% if is_commissioner %}
+        <a href="{% url 'fantasy:set_draft_time' draft.pk %}" class="btn btn-sm btn-outline-secondary">{% if draft.draft_time %}Edit Time{% else %}Set Time{% endif %}</a>
+        {% endif %}
+        {% if is_commissioner and draft.status == 'open' and not draft_complete %}
+        <button id="pause-btn" class="btn btn-sm btn-outline-secondary">
+            {% if draft.timer_paused %}▶ Resume{% else %}⏸ Pause{% endif %}
+        </button>
+        {% endif %}
+        {% if is_commissioner and draft.status == 'open' %}
+        <form method="post" action="{% url 'fantasy:lock_draft' draft.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Lock Draft</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pre-draft countdown banner -->
+{% if draft.draft_time and not draft_started %}
+<div class="alert alert-secondary mb-3 py-2 px-3 d-flex align-items-center gap-2"
+    style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:600;">
+    ⏱ Draft starts in
+    <strong id="draft-start-countdown" style="color:var(--green-dark);margin-left:.4rem;"></strong>
+    <span class="ms-auto text-muted" style="font-size:.8rem;font-weight:400;">{{ draft.draft_time|date:"g:i A" }}</span>
+</div>
+{% endif %}
+
+<!-- On the clock banner -->
+{% if draft.status == 'open' and not draft_complete and draft_started %}
+<div id="clock-banner" class="alert mb-3 py-2 px-3 d-flex align-items-center gap-2
+    {% if my_turn %}alert-success{% else %}alert-secondary{% endif %}"
+    style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:600;">
+    {% if my_turn %}
+        ⛳ Your pick — Round {{ current_round }}, Pick {{ pick_in_round }}
+    {% else %}
+        <span id="clock-name">{{ on_the_clock.display }}</span> is on the clock
+        &nbsp;<span class="text-muted" style="font-size:.85rem;font-weight:400;">Round {{ current_round }}, Pick {{ pick_in_round }}</span>
+    {% endif %}
+    <span id="pick-timer-text" class="ms-auto" style="font-size:.85rem;font-weight:700;min-width:3rem;text-align:right;"></span>
+</div>
+<div id="pick-timer-bar-wrap" style="height:4px;background:#e9ecef;border-radius:2px;margin-bottom:.75rem;display:none;">
+    <div id="pick-timer-bar" style="height:4px;background:var(--green-dark);border-radius:2px;width:100%;transition:width .95s linear;"></div>
+</div>
+{% elif draft_complete or draft.status == 'locked' %}
+<div class="alert alert-secondary mb-3 py-2 px-3" style="font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;">
+    Draft complete — all picks locked in.
+</div>
+{% endif %}
+
+<div class="row g-3">
+
+    <!-- Team list sidebar -->
+    <div class="col-lg-3 col-md-4 col-12">
+        <div class="card shadow-sm">
+            <div class="card-body p-2">
+                <div class="mb-2" style="font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:700;color:var(--green-dark);text-transform:uppercase;letter-spacing:.06em;">Teams</div>
+                <div id="team-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selected team detail -->
+    <div class="col-lg-5 col-md-8 col-12">
+        <div class="card shadow-sm">
+            <div class="card-body p-3">
+                <h6 id="team-detail-name" class="mb-2" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--green-dark);"></h6>
+                <table class="table table-sm leaderboard mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:36px;">#</th>
+                            <th>Player</th>
+                            <th class="text-end" style="font-size:.75rem;">{% if has_odds %}Odds{% else %}Ranking{% endif %}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="team-detail-picks"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available players / pick form -->
+    <div class="col-lg-4">
+        {% if not draft_started %}
+        <div class="card shadow-sm">
+            <div class="card-body p-3 text-center py-4">
+                <div class="text-muted small mb-1">Picks open at</div>
+                <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:700;color:var(--green-dark);">{{ draft.draft_time|date:"g:i A" }}</div>
+                <div class="text-muted" style="font-size:.75rem;">{{ draft.draft_time|date:"N j, Y" }}</div>
+            </div>
+        </div>
+        {% elif my_turn and draft.status == 'open' %}
+
+        <!-- Pick preview (hidden until a player is selected) -->
+        <div id="pick-preview" class="card shadow-sm mb-3" style="display:none;border:2px solid var(--green-dark);">
+            <div class="card-body p-3">
+                <div class="text-muted small mb-1" style="font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:.7rem;">Selected</div>
+                <div id="preview-name" class="fw-bold mb-1" style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;color:var(--green-dark);"></div>
+                <div id="preview-meta" class="text-muted small mb-3"></div>
+                <div class="d-flex gap-2">
+                    <button id="confirm-pick-btn" class="btn btn-sm flex-grow-1" style="background:var(--green-dark);color:#fff;font-weight:600;">Confirm Pick</button>
+                    <button id="cancel-pick-btn" class="btn btn-sm btn-outline-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player list -->
+        <div class="card shadow-sm">
+            <div class="card-body p-3">
+                <h6 class="mb-2 d-flex justify-content-between" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--green-dark);">
+                    Make Your Pick
+                    <span class="text-muted fw-normal" style="font-size:.7rem;">{% if has_odds %}Odds{% else %}World Ranking{% endif %}</span>
+                </h6>
+                <input type="search" id="pick-search" placeholder="Search player…" class="form-control form-control-sm mb-2" autocomplete="off">
+                <div id="pick-list" style="max-height:360px;overflow-y:auto;">
+                    {% for entry in available %}
+                    <div class="pick-row d-flex align-items-center justify-content-between py-1 border-bottom"
+                         data-name="{{ entry.player.display_name|lower }}"
+                         data-player-id="{{ entry.player.pk }}"
+                         data-display-name="{{ entry.player.display_name }}"
+                         data-meta="{% if has_odds %}{{ odds_map|get_odds:entry.player_id }}{% elif entry.player.world_ranking %}#{{ entry.player.world_ranking }}{% endif %}">
+                        <span class="small">{{ entry.player.display_name }}
+                            <span class="text-muted" style="font-size:.75rem;">
+                                {% if has_round_scores and entry.total_score_to_par is not None %}
+                                    {% if entry.total_score_to_par < 0 %}{{ entry.total_score_to_par }}{% elif entry.total_score_to_par > 0 %}+{{ entry.total_score_to_par }}{% else %}E{% endif %}
+                                {% endif %}
+                            </span>
+                        </span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-muted" style="font-size:.7rem;">
+                                {% if has_odds %}{{ odds_map|get_odds:entry.player_id }}
+                                {% elif entry.player.world_ranking %}#{{ entry.player.world_ranking }}{% endif %}
+                            </span>
+                            <button class="btn btn-sm px-2 py-0 pick-btn"
+                                    style="background:var(--green-dark);color:#fff;font-size:.75rem;"
+                                    data-player-id="{{ entry.player.pk }}">Pick</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card shadow-sm">
+            <div class="card-body p-3">
+                <h6 class="mb-2 d-flex justify-content-between" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;color:var(--green-dark);">
+                    Available Players
+                    <span class="text-muted fw-normal" style="font-size:.7rem;">{% if has_odds %}Odds{% else %}World Ranking{% endif %}</span>
+                </h6>
+                <div style="max-height:420px;overflow-y:auto;">
+                    {% for entry in available %}
+                    <div class="d-flex align-items-center justify-content-between py-1 border-bottom">
+                        <span class="small">{{ entry.player.display_name }}</span>
+                        <span class="text-muted small">
+                            {% if has_odds %}{{ odds_map|get_odds:entry.player_id }}
+                            {% elif entry.player.world_ranking %}#{{ entry.player.world_ranking }}{% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+{% csrf_token %}
+
+{% endblock %}
+
+{% block extra_js %}
+<style>
+@keyframes livepulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: .25; }
+}
+.team-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: .3rem .5rem;
+    margin-bottom: .2rem;
+    border-radius: .25rem;
+    border: 1px solid transparent;
+    background: none;
+    font-size: .82rem;
+    cursor: pointer;
+    line-height: 1.3;
+    transition: background .1s;
+}
+.team-btn:hover { background: #f0efe8; }
+.team-btn.active { background: var(--green-dark); color: #fff; font-weight: 600; }
+.team-btn.active .team-sub { color: rgba(255,255,255,.7); }
+.team-sub { display: block; font-size: .68rem; color: #888; }
+</style>
+<script>
+const TEAMS       = {{ teams_json|safe }};
+const MY_ID       = {{ my_membership.pk }};
+const ROSTER_SIZE = {{ league.roster_size }};
+const STORAGE_KEY = 'draft_team_{{ draft.pk }}';
+
+let activeTeamId = parseInt(sessionStorage.getItem(STORAGE_KEY)) || MY_ID;
+
+function renderTeamList() {
+    const container = document.getElementById('team-list');
+    if (!container) return;
+    container.innerHTML = '';
+    TEAMS.forEach(team => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'team-btn' + (team.member_id === activeTeamId ? ' active' : '');
+        const nameLine = team.username + (team.is_on_clock ? ' ⛳' : '');
+        const subLine  = (team.is_mine ? 'you · ' : '') + team.picks.length + '/' + ROSTER_SIZE + ' picks';
+        btn.innerHTML  = nameLine + '<span class="team-sub">' + subLine + '</span>';
+        btn.addEventListener('click', () => {
+            activeTeamId = team.member_id;
+            sessionStorage.setItem(STORAGE_KEY, activeTeamId);
+            renderTeamList();
+            renderTeamDetail();
+        });
+        container.appendChild(btn);
+    });
+}
+
+function renderTeamDetail() {
+    const team = TEAMS.find(t => t.member_id === activeTeamId);
+    if (!team) return;
+
+    const nameEl = document.getElementById('team-detail-name');
+    if (nameEl) {
+        nameEl.textContent = team.username + (team.is_mine ? " (Your Team)" : "'s Team");
+    }
+
+    const tbody = document.getElementById('team-detail-picks');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (team.picks.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="3" class="text-muted small py-3 text-center">No picks yet</td>';
+        tbody.appendChild(tr);
+        return;
+    }
+
+    for (let i = 0; i < ROSTER_SIZE; i++) {
+        const pick = team.picks[i];
+        const tr   = document.createElement('tr');
+        if (pick) {
+            tr.innerHTML =
+                '<td class="text-muted small">' + pick.pick_number + '</td>' +
+                '<td class="small fw-semibold">' + escHtml(pick.player_name) + '</td>' +
+                '<td class="text-end text-muted small">' + escHtml(pick.odds || '—') + '</td>';
+        } else {
+            tr.style.opacity = '.4';
+            tr.innerHTML =
+                '<td class="text-muted small">' + (i + 1) + '</td>' +
+                '<td class="text-muted small">—</td>' +
+                '<td></td>';
+        }
+        tbody.appendChild(tr);
+    }
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+renderTeamList();
+renderTeamDetail();
+
+
+// Pick buttons submit via fetch then reload
+const PICK_URL  = "{% url 'fantasy:make_pick' draft.pk %}";
+const PICK_CSRF   = document.querySelector('[name=csrfmiddlewaretoken]').value;
+const pickPreview = document.getElementById('pick-preview');
+const previewName = document.getElementById('preview-name');
+const previewMeta = document.getElementById('preview-meta');
+const confirmBtn  = document.getElementById('confirm-pick-btn');
+const cancelBtn   = document.getElementById('cancel-pick-btn');
+let pendingPlayerId = null;
+
+function showPreview(playerId, displayName, meta) {
+    pendingPlayerId = playerId;
+    previewName.textContent = displayName;
+    previewMeta.textContent = meta || '';
+    pickPreview.style.display = 'block';
+    pickPreview.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+function clearPreview() {
+    pendingPlayerId = null;
+    pickPreview.style.display = 'none';
+    previewName.textContent = '';
+    previewMeta.textContent = '';
+}
+
+document.querySelectorAll('.pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const row = btn.closest('.pick-row');
+        showPreview(btn.dataset.playerId, row.dataset.displayName, row.dataset.meta);
+    });
+});
+
+if (cancelBtn) cancelBtn.addEventListener('click', clearPreview);
+
+if (confirmBtn) {
+    confirmBtn.addEventListener('click', () => {
+        if (!pendingPlayerId) return;
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Drafting...';
+        const body = new URLSearchParams({player_id: pendingPlayerId});
+        fetch(PICK_URL, {
+            method: 'POST',
+            headers: {'X-CSRFToken': PICK_CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body,
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) { location.reload(); }
+            else {
+                alert(data.error || 'Pick failed.');
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Confirm Pick';
+            }
+        })
+        .catch(() => {
+            alert('Network error.');
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Confirm Pick';
+        });
+    });
+}
+
+// Search filter within pick list
+const pickSearch = document.getElementById('pick-search');
+if (pickSearch) {
+    pickSearch.addEventListener('input', () => {
+        const term = pickSearch.value.toLowerCase();
+        document.querySelectorAll('.pick-row').forEach(row => {
+            const name = row.dataset.name || '';
+            row.style.display = (!term || name.startsWith(term) || name.includes(' ' + term)) ? '' : 'none';
+        });
+    });
+}
+
+// Draft time countdown (header badge + pre-draft lobby banner)
+{% if draft.draft_time %}
+(function() {
+    const target      = new Date("{{ draft.draft_time|date:'c' }}");
+    const headerEl    = document.getElementById('draft-countdown');
+    const lobbyEl     = document.getElementById('draft-start-countdown');
+    const draftStarted = {{ draft_started|yesno:'true,false' }};
+    function fmt(diff) {
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        return d > 0 ? `${d}d ${h}h ${m}m` : h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+    }
+    function tick() {
+        const diff = target - Date.now();
+        if (diff <= 0) {
+            if (!draftStarted) { location.reload(); return; }
+            if (headerEl) headerEl.textContent = 'Started';
+            return;
+        }
+        const text = fmt(diff);
+        if (headerEl) headerEl.textContent = text;
+        if (lobbyEl)  lobbyEl.textContent  = text;
+        setTimeout(tick, 1000);
+    }
+    tick();
+})();
+{% endif %}
+
+// Pause button
+const pauseBtn = document.getElementById('pause-btn');
+if (pauseBtn) {
+    const TOGGLE_URL = "{% url 'fantasy:toggle_timer' draft.pk %}";
+    const CSRF_BTN   = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    pauseBtn.addEventListener('click', () => {
+        fetch(TOGGLE_URL, {
+            method: 'POST',
+            headers: {'X-CSRFToken': CSRF_BTN, 'X-Requested-With': 'XMLHttpRequest'},
+        }).then(r => r.json()).then(data => {
+            pauseBtn.textContent = data.paused ? '▶ Resume' : '⏸ Pause';
+        });
+    });
+}
+
+// Live polling, pick timer, and auto-pick
+(function () {
+    const POLL_URL     = "{% url 'fantasy:draft_state_api' draft.pk %}";
+    const AUTOPICK_URL = "{% url 'fantasy:autopick' draft.pk %}";
+    const CSRF         = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const DRAFT_OPEN   = {{ draft_open|yesno:'true,false' }};
+    let lastPicks      = {{ total_picks }};
+    let lastStatus     = "{{ draft.status }}";
+    let wasMyTurn      = {{ my_turn|yesno:'true,false' }};
+    let autopickSent   = false;
+
+    const timerText    = document.getElementById('pick-timer-text');
+    const timerBarWrap = document.getElementById('pick-timer-bar-wrap');
+    const timerBar     = document.getElementById('pick-timer-bar');
+
+    if (!DRAFT_OPEN) return;
+
+    // Seed timer from server-rendered values so it starts immediately
+    {% if draft_open and draft.current_pick_started_at %}
+    const _startedAt = new Date("{{ draft.current_pick_started_at|date:'c' }}");
+    const _elapsed   = (Date.now() - _startedAt) / 1000;
+    let localSeconds = {% if draft.timer_paused %}{{ draft.seconds_at_pause|default:0 }}{% else %}Math.max(0, {{ draft.pick_time_limit }} - _elapsed){% endif %};
+    {% else %}
+    let localSeconds = null;
+    {% endif %}
+    let localLimit   = {{ draft.pick_time_limit }};
+    let localPaused  = {{ draft.timer_paused|yesno:'true,false' }};
+    let tickHandle   = null;
+
+    if (localSeconds !== null) {
+        renderTimer(localSeconds, localLimit, localPaused);
+        if (!localPaused) startTick();
+    }
+
+    function renderTimer(s, limit, paused) {
+        if (s === null || !timerText) return;
+        const sc  = Math.ceil(s);
+        const pct = Math.max(0, (s / limit) * 100);
+        timerText.textContent = paused ? `${sc}s ⏸` : (sc > 0 ? `${sc}s` : '0s');
+        timerText.style.color = paused ? '#888' : (sc <= 30 ? '#e74c3c' : sc <= 60 ? '#e67e22' : 'inherit');
+        if (timerBarWrap) {
+            timerBarWrap.style.display = 'block';
+            timerBar.style.width = pct + '%';
+            timerBar.style.background = paused ? '#aaa' : (sc <= 30 ? '#e74c3c' : sc <= 60 ? '#e67e22' : 'var(--green-dark)');
+        }
+        if (pauseBtn) pauseBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+    }
+
+    function startTick() {
+        if (tickHandle) clearInterval(tickHandle);
+        tickHandle = setInterval(() => {
+            if (localPaused || localSeconds === null) return;
+            localSeconds = Math.max(0, localSeconds - 1);
+            renderTimer(localSeconds, localLimit, localPaused);
+            if (localSeconds <= 0 && !autopickSent) {
+                autopickSent = true;
+                fetch(AUTOPICK_URL, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest'},
+                }).then(() => { autopickSent = false; }).catch(() => { autopickSent = false; });
+            }
+        }, 1000);
+    }
+
+    function updateTeamsFromPicks(picks) {
+        TEAMS.forEach(t => { t.picks = []; });
+        picks.forEach(p => {
+            const team = TEAMS.find(t => t.member_id === p.member_id);
+            if (team) team.picks.push({ pick_number: p.pick_number, player_name: p.player__display_name, odds: '' });
+        });
+    }
+
+    function updateClockName(onTheClock) {
+        const el = document.getElementById('clock-name');
+        if (el && onTheClock) el.textContent = onTheClock;
+        TEAMS.forEach(t => { t.is_on_clock = (onTheClock && t.username === onTheClock); });
+    }
+
+    function poll() {
+        fetch(POLL_URL, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(r => r.json())
+            .then(data => {
+                if (data.seconds_remaining !== null && data.seconds_remaining !== undefined) {
+                    localSeconds = data.seconds_remaining;
+                    localLimit   = data.pick_time_limit;
+                    localPaused  = data.timer_paused;
+                    renderTimer(localSeconds, localLimit, localPaused);
+                    if (!localPaused && tickHandle === null) startTick();
+                    if (localPaused && tickHandle) { clearInterval(tickHandle); tickHandle = null; }
+                    if (!localPaused && tickHandle === null) startTick();
+                }
+
+                const picksChanged  = data.total_picks !== lastPicks;
+                const statusChanged = data.status !== lastStatus;
+                const turnChanged   = !wasMyTurn && data.my_turn;
+                const iLostMyTurn   = wasMyTurn && !data.my_turn;
+
+                // Must reload: draft locked, it's now my turn, or I just made a pick
+                if (statusChanged || turnChanged || iLostMyTurn) {
+                    location.reload();
+                    return;
+                }
+
+                // Silent update: someone else's pick — update team list without reload
+                if (picksChanged && data.picks) {
+                    updateTeamsFromPicks(data.picks);
+                    updateClockName(data.on_the_clock);
+                    lastPicks = data.total_picks;
+                    renderTeamList();
+                    renderTeamDetail();
+                }
+
+                setTimeout(poll, 2500);
+            })
+            .catch(() => setTimeout(poll, 2500));
+    }
+
+    setTimeout(poll, 2500);
+})();
+</script>
+{% endblock %}

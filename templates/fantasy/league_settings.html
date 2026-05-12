@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}League Settings — {{ league.name }} — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-sm-8 col-md-6 col-lg-4">
+        <h1 class="mb-1" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">League Settings</h1>
+        <p class="text-muted small mb-4">{{ league.name }}</p>
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                {% if error %}
+                <div class="alert alert-danger py-2 small">{{ error }}</div>
+                {% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">League Name</label>
+                        <input type="text" name="name" value="{{ league.name }}" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold">Roster Size (picks per team per week)</label>
+                        <input type="number" name="roster_size" value="{{ league.roster_size }}" min="1" max="20" class="form-control form-control-sm" required>
+                        <div class="form-text">Between 1 and 20.</div>
+                    </div>
+                    <button type="submit" class="btn btn-sm w-100" style="background:var(--green-dark);color:#fff;">Save Settings</button>
+                </form>
+            </div>
+        </div>
+        <p class="text-center text-muted small mt-3">
+            <a href="{% url 'fantasy:league_detail' league.pk %}">← Back to League</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

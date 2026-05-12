@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Register — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-sm-8 col-md-5 col-lg-4">
+        <div class="card shadow-sm mt-5">
+            <div class="card-body p-4">
+                <h4 class="mb-4" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;">Create Account</h4>
+                <form method="post">
+                    {% csrf_token %}
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">{{ field.label }}</label>
+                        <input type="{{ field.field.widget.input_type }}"
+                               name="{{ field.html_name }}"
+                               class="form-control form-control-sm{% if field.errors %} is-invalid{% endif %}"
+                               {% if field.value %}value="{{ field.value }}"{% endif %}>
+                        {% for error in field.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                        {% if field.help_text %}
+                        <div class="form-text text-muted" style="font-size:.75rem;">{{ field.help_text }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <button type="submit" class="btn btn-sm w-100" style="background:var(--green-dark);color:#fff;">Create Account</button>
+                </form>
+                <p class="text-center text-muted small mt-3 mb-0">
+                    Already have an account? <a href="{% url 'login' %}">Sign in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

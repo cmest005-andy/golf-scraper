@@ -109,34 +109,51 @@
     {% endif %}
 </div>
 
-{% if recent_scores %}
-<h5 class="mb-3">Recent Scores</h5>
+{% if recent_results %}
+<h5 class="mb-3">2026 Results</h5>
 <div class="card shadow-sm">
     <div class="table-responsive">
-        <table class="table table-hover table-striped mb-0">
-            <thead class="table-dark">
+        <table class="table leaderboard mb-0">
+            <thead>
                 <tr>
                     <th>Tournament</th>
-                    <th class="text-center">Round</th>
-                    <th class="text-center">Strokes</th>
-                    <th class="text-center">Score</th>
+                    <th class="text-center d-none d-md-table-cell">Pos</th>
+                    {% for rn in round_columns %}
+                    <th class="text-center d-none d-md-table-cell">R{{ rn }}</th>
+                    {% endfor %}
+                    <th class="text-center">Total</th>
                 </tr>
             </thead>
             <tbody>
-                {% for score in recent_scores %}
+                {% for entry, round_scores in recent_results %}
                 <tr>
-                    <td>{{ score.tournament.name }}</td>
-                    <td class="text-center">R{{ score.round.round_number }}</td>
-                    <td class="text-center">{{ score.strokes|default:"—" }}</td>
-                    <td class="text-center">
-                        {% if score.score_to_par is None %}
-                            <span class="text-muted">—</span>
-                        {% elif score.score_to_par < 0 %}
-                            <span class="score-under">{{ score.score_to_par }}</span>
-                        {% elif score.score_to_par > 0 %}
-                            <span class="score-over">+{{ score.score_to_par }}</span>
+                    <td>
+                        <a href="{% url 'golf:index' %}?tournament={{ entry.tournament.pk }}" class="player-link">
+                            {{ entry.tournament.name }}
+                        </a>
+                    </td>
+                    <td class="text-center d-none d-md-table-cell pos-cell
+                        {% if entry.position == '1' %}pos-1{% elif entry.position == '2' or entry.position == '3' %}pos-2{% endif %}">
+                        {{ entry.position|default:"—" }}
+                    </td>
+                    {% for score in round_scores %}
+                    <td class="text-center small d-none d-md-table-cell">
+                        {% if score and score.strokes is not None %}
+                            {% if score.score_to_par is not None and score.score_to_par < 0 %}<span class="score-under">{{ score.strokes }}</span>
+                            {% elif score.score_to_par is not None and score.score_to_par > 0 %}<span class="score-over">{{ score.strokes }}</span>
+                            {% elif score.score_to_par == 0 %}<span class="score-even">{{ score.strokes }}</span>
+                            {% else %}{{ score.strokes }}
+                            {% endif %}
                         {% else %}
-                            <span class="score-even">E</span>
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="text-center total-cell">
+                        {% if entry.total_score_to_par is None %}<span class="text-muted">—</span>
+                        {% elif entry.total_score_to_par < 0 %}<span class="score-under">{{ entry.total_score_to_par }}</span>
+                        {% elif entry.total_score_to_par > 0 %}<span class="score-over">+{{ entry.total_score_to_par }}</span>
+                        {% else %}<span class="score-even">E</span>
                         {% endif %}
                     </td>
                 </tr>

@@ -1,21 +1,56 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
+import requests
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from golf.models import Leaderboard, Player, PlayerScore, Tournament, TournamentRound
-from golf.scraper.espn import fetch_scoreboard
+from golf.models import Course, Leaderboard, Player, PlayerScore, Tournament, TournamentRound
+from golf.scraper.espn import fetch_scoreboard, fetch_tournament_venue
+
+BASE_URL = settings.ESPN_API_BASE_URL
 
 
 class Command(BaseCommand):
     help = 'Scrape PGA Tour scoreboard data from ESPN and save to database'
 
-    def handle(self, *args, **options):
-        self.stdout.write('Fetching PGA scoreboard from ESPN...')
-        data = fetch_scoreboard()
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--backfill',
+            type=int,
+            metavar='WEEKS',
+            help='Also scrape this many past weeks of data',
+        )
 
+    def handle(self, *args, **options):
+        weeks_back = options.get('backfill') or 0
+
+        dates_to_fetch = []
+        if weeks_back:
+            today = datetime.now().date()
+            for i in range(1, weeks_back + 1):
+                dates_to_fetch.append(today - timedelta(weeks=i))
+
+        # Past weeks first (oldest → newest), then current
+        for past_date in reversed(dates_to_fetch):
+            self.stdout.write(f'\nFetching week of {past_date} ...')
+            try:
+                r = requests.get(
+                    f'{BASE_URL}/scoreboard',
+                    params={'dates': past_date.strftime('%Y%m%d')},
+                    timeout=10,
+                )
+                r.raise_for_status()
+                events = r.json().get('events', [])
+                self.stdout.write(f'  Found {len(events)} event(s)')
+                for event in events:
+                    self._process_event(event)
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f'  Skipped ({e})'))
+
+        self.stdout.write('\nFetching current scoreboard...')
+        data = fetch_scoreboard()
         events = data.get('events', [])
         self.stdout.write(f'Found {len(events)} event(s)\n')
-
         for event in events:
             self._process_event(event)
 
@@ -49,6 +84,17 @@ class Command(BaseCommand):
 
         action = 'Created' if created else 'Updated'
         self.stdout.write(f'  [{action}] {name}  (status: {status})')
+
+        if tournament.course is None:
+            try:
+                venue_name = fetch_tournament_venue(name)
+                if venue_name:
+                    course, _ = Course.objects.get_or_create(name=venue_name)
+                    tournament.course = course
+                    tournament.save(update_fields=['course'])
+                    self.stdout.write(f'    Venue: {venue_name}')
+            except Exception:
+                pass
 
         for competition in event.get('competitions', []):
             self._process_competition(tournament, competition)
@@ -102,7 +148,7 @@ class Command(BaseCommand):
 
         for linescore in linescores:
             round_number = linescore.get('period')
-            if not round_number:
+            if not round_number or round_number > 4:
                 continue
 
             round_obj, _ = TournamentRound.objects.get_or_create(

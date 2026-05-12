@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Team Scorecard — {{ draft.tournament.name }} — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-4">
+    <div>
+        <h1 class="mb-0" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">
+            {{ league.name }} — Team Scorecard
+        </h1>
+        <span class="text-muted small">{{ draft.tournament.name }} &nbsp;·&nbsp; {{ draft.tournament.start_date|date:"M j" }}–{{ draft.tournament.end_date|date:"M j, Y" }}</span>
+    </div>
+    <a href="{% url 'fantasy:league_detail' league.pk %}" class="btn btn-sm btn-outline-secondary">← League</a>
+</div>
+
+{% for team in standings %}
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between py-2 px-3" style="background:var(--green-dark);">
+        <div class="d-flex align-items-center gap-2">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:var(--gold);min-width:1.5rem;">{{ forloop.counter }}</span>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:#fff;">{{ team.member.display }}</span>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <table class="table leaderboard mb-0">
+            <thead>
+                <tr>
+                    <th>Player</th>
+                    {% for rn in round_numbers %}<th class="text-center">R{{ rn }}</th>{% endfor %}
+                    <th class="text-center">Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in team.players %}
+                <tr {% if p.missed_cut %}style="opacity:.7;"{% endif %}>
+                    <td class="small fw-semibold">
+                        {{ p.player.display_name }}
+                        {% if p.missed_cut %}<span class="text-muted" style="font-size:.7rem;"> MC</span>{% endif %}
+                    </td>
+                    {% for score in p.round_scores %}
+                    <td class="text-center small">
+                        {% if score == 'MC' %}
+                        <span class="text-muted">MC</span>
+                        {% elif score is not None %}
+                        {{ score }}
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                    <td class="text-center small">
+                        {% if p.entry and p.entry.total_score_to_par is not None %}
+                            {% if p.entry.total_score_to_par < 0 %}<span class="score-under">{{ p.entry.total_score_to_par }}</span>
+                            {% elif p.entry.total_score_to_par > 0 %}<span class="score-over">+{{ p.entry.total_score_to_par }}</span>
+                            {% else %}<span class="score-even">E</span>{% endif %}
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="{{ round_numbers|length|add:2 }}" class="text-muted small text-center py-3">No picks yet.</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="border-top:2px solid #dee2e6;background:#f8f9fa;">
+                    <td class="small fw-bold" style="font-family:'Barlow Condensed',sans-serif;letter-spacing:.03em;">Team Total</td>
+                    {% for rn in round_numbers %}<td></td>{% endfor %}
+                    <td class="text-center fw-bold small">
+                        {% if team.team_score is not None %}
+                            {% if team.team_score < 0 %}<span class="score-under">{{ team.team_score }}</span>
+                            {% elif team.team_score > 0 %}<span class="score-over">+{{ team.team_score }}</span>
+                            {% else %}<span class="score-even">E</span>{% endif %}
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}

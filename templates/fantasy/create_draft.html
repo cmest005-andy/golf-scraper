@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Open Draft — {{ league.name }} — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-sm-8 col-md-6 col-lg-4">
+        <h1 class="mb-1" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">Open Draft</h1>
+        <p class="text-muted small mb-4">{{ league.name }}</p>
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                {% if error %}
+                <div class="alert alert-danger py-2 small">{{ error }}</div>
+                {% endif %}
+                {% if tournaments %}
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Select Tournament</label>
+                        <select name="tournament" class="form-select form-select-sm">
+                            {% for t in tournaments %}
+                            <option value="{{ t.pk }}">{{ t.name }} ({{ t.start_date|date:"M j" }} – {{ t.end_date|date:"M j, Y" }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold">Draft Time <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="datetime-local" name="draft_time" class="form-control form-control-sm">
+                        <div class="form-text">Let members know when to show up.</div>
+                    </div>
+                    <button type="submit" class="btn btn-sm w-100" style="background:var(--green-dark);color:#fff;">Open Draft & Randomize Order</button>
+                </form>
+                {% else %}
+                <p class="text-muted small mb-0">All available tournaments already have a draft.</p>
+                {% endif %}
+            </div>
+        </div>
+        <p class="text-center text-muted small mt-3">
+            <a href="{% url 'fantasy:league_detail' league.pk %}">← Back to League</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

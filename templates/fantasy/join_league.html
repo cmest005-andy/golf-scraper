@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Join League — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-sm-8 col-md-6 col-lg-4">
+        <h1 class="mb-4" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">Join a League</h1>
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                {% if error %}
+                <div class="alert alert-danger py-2 small">{{ error }}</div>
+                {% endif %}
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold">Invite Code</label>
+                        <input type="text" name="invite_code" class="form-control form-control-sm text-uppercase"
+                               value="{{ request.POST.invite_code }}" placeholder="e.g. AB12CD34" autofocus
+                               style="letter-spacing:.1em;">
+                    </div>
+                    <button type="submit" class="btn btn-sm w-100" style="background:var(--green-dark);color:#fff;">Join League</button>
+                </form>
+            </div>
+        </div>
+        <p class="text-center text-muted small mt-3">
+            <a href="{% url 'fantasy:my_leagues' %}">← Back to My Leagues</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

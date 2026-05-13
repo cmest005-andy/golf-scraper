@@ -111,11 +111,9 @@ def league_detail(request, pk):
     now = tz.now()
     today = datetime.date.today()
 
-    # Draft currently in progress: open status, draft time has passed
+    # Any open draft shows the banner (lobby or in-progress)
     active_draft = next(
-        (d for d in drafts
-         if d.status == WeeklyDraft.Status.OPEN
-         and d.draft_time and now >= d.draft_time),
+        (d for d in drafts if d.status == WeeklyDraft.Status.OPEN),
         None
     )
 
@@ -266,12 +264,7 @@ def create_draft(request, league_pk):
             draft = WeeklyDraft.objects.create(
                 league=league, tournament=tournament,
                 draft_time=draft_time, pick_time_limit=pick_time_limit,
-                current_pick_started_at=tz.now(),
             )
-            members = list(LeagueMember.objects.filter(league=league))
-            random.shuffle(members)
-            for i, member in enumerate(members, 1):
-                DraftOrder.objects.create(draft=draft, member=member, position=i)
             return redirect('fantasy:draft_room', pk=draft.pk)
 
     return render(request, 'fantasy/create_draft.html', {
@@ -305,6 +298,16 @@ def draft_room(request, pk):
                 'is_commissioner': is_commissioner,
             })
 
+    # Randomize draft order the first time the lobby is accessed
+    if not draft.order.exists():
+        from django.db import transaction
+        with transaction.atomic():
+            if not draft.order.exists():
+                members = list(LeagueMember.objects.filter(league=league))
+                random.shuffle(members)
+                for i, member in enumerate(members, 1):
+                    DraftOrder.objects.create(draft=draft, member=member, position=i)
+
     # Whether the draft clock has started (picks are allowed)
     draft_started = not draft.draft_time or tz.now() >= draft.draft_time
 
@@ -331,6 +334,15 @@ def draft_room(request, pk):
     odds_qs  = OddsModel.objects.filter(tournament=draft.tournament, bookmaker='DraftKings').values('player_id', 'win_odds')
     odds_map = {o['player_id']: o['win_odds'] for o in odds_qs}
     has_odds = bool(odds_map)
+
+    # Re-sort available by odds when odds exist and no live scores yet
+    if has_odds and not has_round_scores:
+        def _odds_key(entry):
+            try:
+                return int(odds_map.get(entry.player_id, '') or '99999')
+            except ValueError:
+                return 99999
+        available = sorted(available, key=_odds_key)
 
     picks_by_member = draft.picks_by_member()
     draft_order     = list(draft.order.select_related('member__user'))
@@ -426,6 +438,11 @@ def make_pick(request, pk):
         member=membership,
         player=entry.player,
         pick_number=pick_number,
+    )
+    DraftMessage.objects.create(
+        draft=draft,
+        is_system=True,
+        text=f'⛳ {membership.display()} drafted {entry.player.display_name} (Pick #{pick_number})',
     )
 
     # Reset pick timer and auto-lock when all picks are made
@@ -528,8 +545,7 @@ def draft_state_api(request, pk):
     since_id = int(request.GET.get('since', 0))
     messages = list(
         draft.messages.filter(id__gt=since_id)
-        .select_related('user__profile')
-        .values('id', 'user__username', 'text', 'created_at')
+        .values('id', 'user__username', 'text', 'is_system', 'created_at')
     )
     for m in messages:
         m['created_at'] = m['created_at'].strftime('%H:%M')
@@ -594,20 +610,15 @@ def autopick(request, pk):
     if not member:
         return JsonResponse({'error': 'Draft complete.'}, status=400)
 
-    # Best available player: lowest world_ranking if no scores, else best score_to_par
+    from fantasy.scheduler import _best_available
     taken_ids = draft.picks.values_list('player_id', flat=True)
-    available = (
+    available = list(
         Leaderboard.objects
         .filter(tournament=draft.tournament)
         .exclude(player_id__in=taken_ids)
         .select_related('player')
     )
-    # Pre-tournament: sort by world_ranking; in-progress: sort by total_score_to_par
-    has_scores = available.filter(total_score_to_par__isnull=False).exists()
-    if has_scores:
-        best = available.order_by('total_score_to_par', 'player__world_ranking').first()
-    else:
-        best = available.order_by('player__world_ranking').first()
+    best = _best_available(available, draft.tournament)
 
     if not best:
         return JsonResponse({'error': 'No players available.'}, status=400)

@@ -105,15 +105,17 @@
 
     <!-- Available players / pick form -->
     <div class="col-lg-4">
-        {% if not draft_started %}
-        <div class="card shadow-sm">
-            <div class="card-body p-3 text-center py-4">
+        {% if draft.status == 'open' %}
+
+        {% if not draft_started and draft.draft_time %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body p-3 text-center py-3">
                 <div class="text-muted small mb-1">Picks open at</div>
                 <div style="font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:700;color:var(--green-dark);">{{ draft.draft_time|date:"g:i A" }}</div>
                 <div class="text-muted" style="font-size:.75rem;">{{ draft.draft_time|date:"N j, Y" }}</div>
             </div>
         </div>
-        {% elif draft.status == 'open' %}
+        {% endif %}
 
         <!-- My-turn panel -->
         <div id="pick-panel-mine" style="display:{% if my_turn %}block{% else %}none{% endif %};">
@@ -235,6 +237,7 @@
 .team-btn:hover { background: #f0efe8; }
 .team-btn.active { background: var(--green-dark); color: #fff; font-weight: 600; }
 .team-btn.active .team-sub { color: rgba(255,255,255,.7); }
+.team-btn.selected { border-color: var(--green-dark); background: #f0f7f0; }
 .team-sub { display: block; font-size: .68rem; color: #888; }
 </style>
 <script>
@@ -252,10 +255,13 @@ function renderTeamList() {
     TEAMS.forEach(team => {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'team-btn' + (team.member_id === activeTeamId ? ' active' : '');
-        const nameLine = team.username + (team.is_on_clock ? ' ⛳' : '');
+        let cls = 'team-btn';
+        if (team.is_on_clock)              cls += ' active';
+        else if (team.member_id === activeTeamId) cls += ' selected';
+        btn.className = cls;
+        const nameHtml = (team.is_mine ? '<strong>' : '') + escHtml(team.username) + (team.is_mine ? '</strong>' : '') + (team.is_on_clock ? ' ⛳' : '');
         const subLine  = (team.is_mine ? 'you · ' : '') + team.picks.length + '/' + ROSTER_SIZE + ' picks';
-        btn.innerHTML  = nameLine + '<span class="team-sub">' + subLine + '</span>';
+        btn.innerHTML  = nameHtml + '<span class="team-sub">' + subLine + '</span>';
         btn.addEventListener('click', () => {
             activeTeamId = team.member_id;
             sessionStorage.setItem(STORAGE_KEY, activeTeamId);
@@ -545,19 +551,6 @@ if (pauseBtn) {
         });
     }
 
-    function announceNewPicks(picks) {
-        const newPicks = picks.filter(p => p.pick_number > lastPicks);
-        if (!newPicks.length || !window.appendSystemMessage) return;
-        newPicks.forEach(p => {
-            const team    = TEAMS.find(t => t.member_id === p.member_id);
-            const picker  = team ? team.username : p.member__user__username;
-            window.appendSystemMessage(
-                '⛳ <strong>' + picker + '</strong> drafted <strong>' + p.player__display_name + '</strong>' +
-                ' <span style="opacity:.6;font-weight:400;">(Pick #' + p.pick_number + ')</span>'
-            );
-        });
-    }
-
     function poll() {
         const since = window._lastMsgId || 0;
         fetch(POLL_URL + '?since=' + since, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
@@ -601,7 +594,6 @@ if (pauseBtn) {
 
                 // Any pick: update team list + hide picked player from both panels
                 if (picksChanged && data.picks) {
-                    announceNewPicks(data.picks);
                     updateTeamsFromPicks(data.picks);
                     hidePickedPlayers(data.picks);
                     if (!turnChanged && !iLostMyTurn) {
@@ -648,21 +640,31 @@ if (pauseBtn) {
         msgs.forEach(m => {
             lastMsgId = Math.max(lastMsgId, m.id);
             window._lastMsgId = lastMsgId;
-            const isMe = m.user__username === ME;
-            const row  = document.createElement('div');
-            row.style.cssText = 'display:flex;flex-direction:column;align-items:' + (isMe ? 'flex-end' : 'flex-start') + ';';
-            const bubble = document.createElement('div');
-            bubble.style.cssText = [
-                'max-width:80%;padding:.25rem .6rem;border-radius:.75rem;font-size:.8rem;line-height:1.35;',
-                isMe
-                    ? 'background:var(--green-dark);color:#fff;border-bottom-right-radius:.2rem;'
-                    : 'background:#e9ecef;color:#212529;border-bottom-left-radius:.2rem;'
-            ].join('');
-            bubble.innerHTML = '<span style="font-weight:700;font-size:.7rem;display:block;margin-bottom:.1rem;opacity:.8;">' + esc(m.user__username) + '</span>' +
-                esc(m.text) +
-                '<span style="font-size:.6rem;opacity:.6;margin-left:.4rem;">' + esc(m.created_at) + '</span>';
-            row.appendChild(bubble);
-            chatBox.appendChild(row);
+            if (m.is_system) {
+                const row  = document.createElement('div');
+                row.style.cssText = 'text-align:center;padding:.25rem .5rem;';
+                const pill = document.createElement('span');
+                pill.style.cssText = 'display:inline-block;background:#d4edda;color:#155724;border:1px solid #b8dacc;border-radius:999px;padding:.2rem .75rem;font-size:.78rem;font-weight:600;';
+                pill.innerHTML = esc(m.text);
+                row.appendChild(pill);
+                chatBox.appendChild(row);
+            } else {
+                const isMe = m.user__username === ME;
+                const row  = document.createElement('div');
+                row.style.cssText = 'display:flex;flex-direction:column;align-items:' + (isMe ? 'flex-end' : 'flex-start') + ';';
+                const bubble = document.createElement('div');
+                bubble.style.cssText = [
+                    'max-width:80%;padding:.25rem .6rem;border-radius:.75rem;font-size:.8rem;line-height:1.35;',
+                    isMe
+                        ? 'background:var(--green-dark);color:#fff;border-bottom-right-radius:.2rem;'
+                        : 'background:#e9ecef;color:#212529;border-bottom-left-radius:.2rem;'
+                ].join('');
+                bubble.innerHTML = '<span style="font-weight:700;font-size:.7rem;display:block;margin-bottom:.1rem;opacity:.8;">' + esc(m.user__username) + '</span>' +
+                    esc(m.text) +
+                    '<span style="font-size:.6rem;opacity:.6;margin-left:.4rem;">' + esc(m.created_at) + '</span>';
+                row.appendChild(bubble);
+                chatBox.appendChild(row);
+            }
         });
         if (atBottom) chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -670,18 +672,6 @@ if (pauseBtn) {
     // Expose for poll callback
     window.appendMessages = appendMessages;
 
-    function appendSystemMessage(html) {
-        const atBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 40;
-        const row = document.createElement('div');
-        row.style.cssText = 'text-align:center;padding:.25rem .5rem;';
-        const pill = document.createElement('span');
-        pill.style.cssText = 'display:inline-block;background:#d4edda;color:#155724;border:1px solid #b8dacc;border-radius:999px;padding:.2rem .75rem;font-size:.78rem;font-weight:600;';
-        pill.innerHTML = html;
-        row.appendChild(pill);
-        chatBox.appendChild(row);
-        if (atBottom) chatBox.scrollTop = chatBox.scrollHeight;
-    }
-    window.appendSystemMessage = appendSystemMessage;
 
     // Load history on page open
     fetch(POLL_URL + '?since=0', {headers: {'X-Requested-With': 'XMLHttpRequest'}})

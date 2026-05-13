@@ -6,20 +6,53 @@ from django.utils import timezone as tz
 logger = logging.getLogger(__name__)
 
 
+def _best_available(available, tournament):
+    """Return the best available Leaderboard entry using odds > score > world ranking."""
+    from golf.models import Odds as OddsModel, PlayerScore
+    has_scores = PlayerScore.objects.filter(tournament=tournament).exists()
+    if has_scores:
+        return min(
+            available,
+            key=lambda e: (e.total_score_to_par if e.total_score_to_par is not None else 9999,
+                           e.player.world_ranking or 9999),
+            default=None,
+        )
+
+    odds_qs  = OddsModel.objects.filter(tournament=tournament, bookmaker='DraftKings').values('player_id', 'win_odds')
+    odds_map = {o['player_id']: o['win_odds'] for o in odds_qs}
+    if odds_map:
+        def _key(e):
+            try:
+                return int(odds_map.get(e.player_id, '') or '99999')
+            except ValueError:
+                return 99999
+        return min(available, key=_key, default=None)
+
+    return min(available, key=lambda e: e.player.world_ranking or 9999, default=None)
+
+
 def autopick_expired_picks():
     """Advance any open draft whose pick timer has expired with no connected client."""
     try:
         from fantasy.models import DraftPick, WeeklyDraft
         from golf.models import Leaderboard
 
+        from django.db.models import Q
         now = tz.now()
         stale = WeeklyDraft.objects.filter(
             status=WeeklyDraft.Status.OPEN,
             timer_paused=False,
-            current_pick_started_at__isnull=False,
+        ).filter(
+            Q(draft_time__isnull=True) | Q(draft_time__lte=now)
         )
 
         for draft in stale:
+            # Initialize pick timer the first time the draft goes live
+            if not draft.current_pick_started_at:
+                draft.current_pick_started_at = now
+                draft.save(update_fields=['current_pick_started_at'])
+                continue
+
             elapsed = (now - draft.current_pick_started_at).total_seconds()
             if elapsed < draft.pick_time_limit:
                 continue
@@ -29,16 +62,13 @@ def autopick_expired_picks():
                 continue
 
             taken_ids = list(draft.picks.values_list('player_id', flat=True))
-            available = (
+            available = list(
                 Leaderboard.objects
                 .filter(tournament=draft.tournament)
                 .exclude(player_id__in=taken_ids)
                 .select_related('player')
             )
-            has_scores = available.filter(total_score_to_par__isnull=False).exists()
-            best = available.order_by(
-                'total_score_to_par' if has_scores else 'player__world_ranking'
-            ).first()
+            best = _best_available(available, draft.tournament)
 
             if not best:
                 logger.warning('autopick: no available players for draft %s', draft.pk)
@@ -50,6 +80,12 @@ def autopick_expired_picks():
                 member=member,
                 player=best.player,
                 pick_number=pick_number,
+            )
+            from fantasy.models import DraftMessage
+            DraftMessage.objects.create(
+                draft=draft,
+                is_system=True,
+                text=f'⛳ {member.display()} drafted {best.player.display_name} (Pick #{pick_number})',
             )
             logger.info(
                 'autopick: draft %s pick #%s → %s for %s',

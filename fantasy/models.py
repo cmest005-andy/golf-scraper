@@ -99,15 +99,16 @@ class DraftOrder(models.Model):
 
 class DraftMessage(models.Model):
     draft      = models.ForeignKey(WeeklyDraft, on_delete=models.CASCADE, related_name='messages')
-    user       = models.ForeignKey(User, on_delete=models.CASCADE)
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     text       = models.CharField(max_length=500)
+    is_system  = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['created_at']
 
     def __str__(self):
-        return f'{self.user.username}: {self.text[:40]}'
+        return f'{"[system]" if self.is_system else self.user.username}: {self.text[:40]}'
 
 
 class DraftPick(models.Model):

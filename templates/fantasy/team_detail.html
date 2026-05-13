@@ -45,15 +45,37 @@
         {% for item in drafts_with_picks %}
         <div class="card shadow-sm mt-3">
             <div class="card-body">
-                <h6 class="mb-3" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--green-dark);">
-                    {{ item.draft.tournament.name }}
-                    <span class="text-muted fw-normal" style="font-size:.75rem;text-transform:none;letter-spacing:0;">{{ item.draft.tournament.start_date|date:"M j" }}–{{ item.draft.tournament.end_date|date:"M j, Y" }}</span>
-                </h6>
-                <ol class="mb-0 ps-3">
+                <div class="d-flex align-items-baseline justify-content-between mb-3">
+                    <h6 class="mb-0" style="font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--green-dark);">
+                        {{ item.draft.tournament.name }}
+                        <span class="text-muted fw-normal" style="font-size:.75rem;text-transform:none;letter-spacing:0;">{{ item.draft.tournament.start_date|date:"M j" }}–{{ item.draft.tournament.end_date|date:"M j, Y" }}</span>
+                    </h6>
+                    {% if item.has_scores and item.team_score is not None %}
+                    <span class="fw-bold" style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;
+                        {% if item.team_score < 0 %}color:#27ae60;{% elif item.team_score > 0 %}color:#e74c3c;{% endif %}">
+                        {% if item.team_score < 0 %}{{ item.team_score }}{% elif item.team_score > 0 %}+{{ item.team_score }}{% else %}E{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                <table class="w-100" style="font-size:.85rem;border-collapse:collapse;">
                     {% for pick in item.picks %}
-                    <li class="py-1 border-bottom small">{{ pick.player.display_name }}</li>
+                    <tr class="border-bottom">
+                        <td class="py-1 text-muted" style="width:1.4rem;">{{ forloop.counter }}.</td>
+                        <td class="py-1">{{ pick.player.display_name }}</td>
+                        <td class="py-1 text-end fw-semibold" style="width:3rem;">
+                            {% if item.has_scores %}
+                                {% if pick.score_to_par is not None %}
+                                    {% if pick.score_to_par < 0 %}<span style="color:#27ae60;">{{ pick.score_to_par }}</span>
+                                    {% elif pick.score_to_par > 0 %}<span style="color:#e74c3c;">+{{ pick.score_to_par }}</span>
+                                    {% else %}<span class="text-muted">E</span>{% endif %}
+                                {% else %}<span class="text-muted">—</span>{% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
                     {% endfor %}
-                </ol>
+                </table>
             </div>
         </div>
         {% empty %}

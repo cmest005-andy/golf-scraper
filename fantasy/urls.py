@@ -19,5 +19,6 @@ urlpatterns = [
     path('drafts/<int:pk>/autopick/',         views.autopick,        name='autopick'),
     path('drafts/<int:pk>/toggle-timer/',     views.toggle_timer,    name='toggle_timer'),
     path('drafts/<int:pk>/state/',            views.draft_state_api,  name='draft_state_api'),
+    path('drafts/<int:pk>/chat/',             views.send_message,     name='send_message'),
     path('drafts/<int:pk>/standings/',        views.draft_standings,  name='draft_standings'),
 ]

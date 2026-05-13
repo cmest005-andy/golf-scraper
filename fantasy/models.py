@@ -97,6 +97,19 @@ class DraftOrder(models.Model):
         return f'{self.draft} — pick {self.position}: {self.member.user.username}'
 
 
+class DraftMessage(models.Model):
+    draft      = models.ForeignKey(WeeklyDraft, on_delete=models.CASCADE, related_name='messages')
+    user       = models.ForeignKey(User, on_delete=models.CASCADE)
+    text       = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.user.username}: {self.text[:40]}'
+
+
 class DraftPick(models.Model):
     draft     = models.ForeignKey(WeeklyDraft, on_delete=models.CASCADE, related_name='picks')
     member    = models.ForeignKey(LeagueMember, on_delete=models.CASCADE, related_name='picks')

@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 
 from golf.models import Leaderboard, PlayerScore, Tournament
 
-from .models import DraftOrder, DraftPick, League, LeagueMember, WeeklyDraft
+from .models import DraftMessage, DraftOrder, DraftPick, League, LeagueMember, WeeklyDraft
 
 
 @login_required
@@ -83,7 +83,8 @@ def league_detail(request, pk):
         order = list(draft.order.select_related('member__user', 'member__user__profile').order_by('position'))
         if not order:
             continue
-        lb_map = {e.player_id: e.total_score_to_par for e in LB.objects.filter(tournament=draft.tournament)}
+        has_scores = PlayerScore.objects.filter(tournament=draft.tournament).exists()
+        lb_map = {e.player_id: e.total_score_to_par for e in LB.objects.filter(tournament=draft.tournament)} if has_scores else {}
         all_picks = DraftPick.objects.filter(draft=draft).select_related('player').order_by('pick_number')
         by_member = {}
         for pick in all_picks:
@@ -121,12 +122,13 @@ def league_detail(request, pk):
     draft_meta = {}
     for draft in drafts:
         if draft.draft_time:
-            lobby_open = draft.draft_time - datetime.timedelta(hours=1)
+            lobby_open    = draft.draft_time - datetime.timedelta(hours=1)
+            local_dt      = tz.localtime(draft.draft_time)
             draft_meta[draft.pk] = {
-                'is_draft_day':   draft.draft_time.date() == today,
-                'lobby_is_open':  now >= lobby_open,
+                'is_draft_day':    local_dt.date() == today,
+                'lobby_is_open':   now >= lobby_open,
                 'lobby_open_time': lobby_open,
-                'draft_started':  now >= draft.draft_time,
+                'draft_started':   now >= draft.draft_time,
             }
         else:
             draft_meta[draft.pk] = {
@@ -178,8 +180,23 @@ def team_detail(request, league_pk, member_pk):
     drafts_with_picks = []
     for draft in WeeklyDraft.objects.filter(league=league).select_related('tournament').order_by('-tournament__start_date'):
         picks = DraftPick.objects.filter(draft=draft, member=membership).select_related('player').order_by('pick_number')
-        if picks.exists():
-            drafts_with_picks.append({'draft': draft, 'picks': picks})
+        if not picks.exists():
+            continue
+        has_scores = PlayerScore.objects.filter(tournament=draft.tournament).exists()
+        lb_map = {e.player_id: e.total_score_to_par for e in Leaderboard.objects.filter(tournament=draft.tournament)} if has_scores else {}
+        pick_data = []
+        team_score = None
+        for pick in picks:
+            stp = lb_map.get(pick.player_id)
+            if stp is not None:
+                team_score = (team_score or 0) + stp
+            pick_data.append({'player': pick.player, 'score_to_par': stp})
+        drafts_with_picks.append({
+            'draft': draft,
+            'picks': pick_data,
+            'has_scores': has_scores,
+            'team_score': team_score,
+        })
 
     return render(request, 'fantasy/team_detail.html', {
         'league': league,
@@ -479,8 +496,20 @@ def draft_state_api(request, pk):
     picks = list(
         draft.picks.select_related('member__user', 'player')
         .order_by('pick_number')
-        .values('pick_number', 'member_id', 'member__user__username', 'player__display_name', 'player__espn_id')
+        .values('pick_number', 'member_id', 'member__user__username',
+                'player__display_name', 'player__espn_id', 'player_id', 'player__world_ranking')
     )
+    from golf.models import Odds as OddsModel
+    odds_qs  = OddsModel.objects.filter(tournament=draft.tournament, bookmaker='DraftKings').values('player_id', 'win_odds')
+    odds_map = {o['player_id']: o['win_odds'] for o in odds_qs}
+    for p in picks:
+        pid = p['player_id']
+        if odds_map:
+            p['odds_str'] = odds_map.get(pid) or ''
+        elif p['player__world_ranking']:
+            p['odds_str'] = '#' + str(p['player__world_ranking'])
+        else:
+            p['odds_str'] = ''
     from django.utils import timezone as tz
     seconds_remaining = None
     if draft.status == WeeklyDraft.Status.OPEN:
@@ -489,6 +518,21 @@ def draft_state_api(request, pk):
         elif draft.current_pick_started_at:
             elapsed = (tz.now() - draft.current_pick_started_at).total_seconds()
             seconds_remaining = max(0, draft.pick_time_limit - elapsed)
+
+    member_count  = draft.league.memberships.count()
+    total_p       = draft.picks.count()
+    draft_done    = member_count > 0 and total_p >= member_count * draft.league.roster_size
+    current_round = (total_p // member_count) + 1 if member_count and not draft_done else draft.league.roster_size
+    pick_in_round = (total_p % member_count) + 1 if member_count and not draft_done else member_count
+
+    since_id = int(request.GET.get('since', 0))
+    messages = list(
+        draft.messages.filter(id__gt=since_id)
+        .select_related('user__profile')
+        .values('id', 'user__username', 'text', 'created_at')
+    )
+    for m in messages:
+        m['created_at'] = m['created_at'].strftime('%H:%M')
 
     return JsonResponse({
         'status':                 draft.status,
@@ -500,6 +544,28 @@ def draft_state_api(request, pk):
         'seconds_remaining':      seconds_remaining,
         'pick_time_limit':        draft.pick_time_limit,
         'timer_paused':           draft.timer_paused,
+        'current_round':          current_round,
+        'pick_in_round':          pick_in_round,
+        'messages':               messages,
+    })
+
+
+@login_required
+@require_POST
+def send_message(request, pk):
+    draft = get_object_or_404(WeeklyDraft, pk=pk)
+    if not LeagueMember.objects.filter(league=draft.league, user=request.user).exists():
+        return JsonResponse({'error': 'Not a member.'}, status=403)
+    text = request.POST.get('text', '').strip()[:500]
+    if not text:
+        return JsonResponse({'error': 'Empty message.'}, status=400)
+    msg = DraftMessage.objects.create(draft=draft, user=request.user, text=text)
+    return JsonResponse({
+        'ok': True,
+        'id': msg.pk,
+        'username': request.user.username,
+        'text': msg.text,
+        'created_at': msg.created_at.strftime('%H:%M'),
     })
 
 

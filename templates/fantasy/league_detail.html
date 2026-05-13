@@ -101,7 +101,7 @@
                                 {% if draft.status != 'scheduled' %}
                                 <a href="{% url 'fantasy:draft_standings' draft.pk %}" class="btn btn-sm btn-outline-secondary">Team Scorecard</a>
                                 {% endif %}
-                                {% if draft.status == 'open' and draft.draft_time and meta.is_draft_day and not meta.draft_started %}
+                                {% if draft.status == 'open' and draft.draft_time and not meta.draft_started %}
                                     {% if meta.lobby_is_open %}
                                     <a href="{% url 'fantasy:draft_room' draft.pk %}" class="btn btn-sm" style="background:var(--green-dark);color:#fff;">Open Draft Lobby</a>
                                     {% else %}

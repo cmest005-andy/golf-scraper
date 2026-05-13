@@ -75,7 +75,7 @@ def start():
     scheduler.add_job(
         autopick_expired_picks,
         'interval',
-        seconds=15,
+        seconds=5,
         id='autopick_expired',
         replace_existing=True,
     )

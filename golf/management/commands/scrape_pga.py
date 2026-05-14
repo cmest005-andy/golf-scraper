@@ -25,7 +25,7 @@ class Command(BaseCommand):
         season = options.get('season')
 
         if season:
-            self.stdout.write(f'Fetching {season} PGA Tour schedule (tournament names/dates only — ESPN does not expose historical scores)...')
+            self.stdout.write(f'Fetching all {season} PGA Tour events...')
             try:
                 r = requests.get(
                     f'https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/seasons/{season}/types/2/events',
@@ -34,35 +34,31 @@ class Command(BaseCommand):
                 )
                 r.raise_for_status()
                 refs = r.json().get('items', [])
-                self.stdout.write(f'  Found {len(refs)} events')
-                for ref in refs:
-                    espn_id = ref.get('$ref', '').rstrip('/').split('/')[-1].split('?')[0]
-                    if not espn_id:
-                        continue
-                    try:
-                        event_r = requests.get(ref['$ref'], timeout=10)
-                        event_r.raise_for_status()
-                        event = event_r.json()
-                        season_obj = event.get('season') or {}
-                        season_year = season_obj.get('year') if isinstance(season_obj, dict) else season
-                        raw_status = event.get('status', {}).get('type', {}).get('state', 'pre')
-                        status_map = {'pre': Tournament.Status.SCHEDULED, 'in': Tournament.Status.IN_PROGRESS, 'post': Tournament.Status.COMPLETED}
-                        tournament, created = Tournament.objects.update_or_create(
-                            espn_id=espn_id,
-                            defaults={
-                                'name': event.get('name', ''),
-                                'season': season_year or season,
-                                'start_date': _parse_date(event.get('date', '')),
-                                'end_date': _parse_date(event.get('endDate', '')),
-                                'status': status_map.get(raw_status, Tournament.Status.SCHEDULED),
-                            },
-                        )
-                        action = 'Created' if created else 'Updated'
-                        self.stdout.write(f'  [{action}] {event.get("name", espn_id)}')
-                    except Exception as e:
-                        self.stdout.write(self.style.WARNING(f'  Skipped {espn_id} ({e})'))
+                self.stdout.write(f'  Found {len(refs)} events\n')
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'Failed to fetch season calendar: {e}'))
+                return
+
+            for ref in refs:
+                try:
+                    event_r = requests.get(ref['$ref'], timeout=10)
+                    event_r.raise_for_status()
+                    event_meta = event_r.json()
+                    start_date = _parse_date(event_meta.get('date', ''))
+                    if not start_date:
+                        continue
+                    date_str = start_date.strftime('%Y%m%d')
+                    scoreboard_r = requests.get(
+                        f'{BASE_URL}/scoreboard',
+                        params={'dates': date_str},
+                        timeout=10,
+                    )
+                    scoreboard_r.raise_for_status()
+                    events = scoreboard_r.json().get('events', [])
+                    for event in events:
+                        self._process_event(event)
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(f'  Skipped ({e})'))
             return
 
         self.stdout.write('\nFetching current scoreboard...')

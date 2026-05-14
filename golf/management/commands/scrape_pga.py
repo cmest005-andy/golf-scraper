@@ -44,19 +44,25 @@ class Command(BaseCommand):
                     event_r = requests.get(ref['$ref'], timeout=10)
                     event_r.raise_for_status()
                     event_meta = event_r.json()
+                    name = event_meta.get('name', '?')
                     start_date = _parse_date(event_meta.get('date', ''))
                     if not start_date:
                         continue
                     date_str = start_date.strftime('%Y%m%d')
+                    self.stdout.write(f'  Fetching {name} ({date_str})...', ending=' ')
+                    self.stdout.flush()
                     scoreboard_r = requests.get(
                         f'{BASE_URL}/scoreboard',
                         params={'dates': date_str},
-                        timeout=10,
+                        timeout=30,
                     )
                     scoreboard_r.raise_for_status()
                     events = scoreboard_r.json().get('events', [])
+                    self.stdout.write(f'got {len(events)} event(s), saving...', ending=' ')
+                    self.stdout.flush()
                     for event in events:
                         self._process_event(event, skip_venue=True)
+                    self.stdout.write('done')
                 except Exception as e:
                     self.stdout.write(self.style.WARNING(f'  Skipped ({e})'))
             return

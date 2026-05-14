@@ -3,5 +3,5 @@ builder = "nixpacks"
 
 [deploy]
 startCommand = "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn golf_scraper.wsgi --workers 2 --bind 0.0.0.0:$PORT"
-healthcheckPath = "/"
+healthcheckPath = "/accounts/login/"
 restartPolicyType = "on_failure"

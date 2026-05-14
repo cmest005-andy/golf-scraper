@@ -120,79 +120,100 @@ class Command(BaseCommand):
             self._process_competition(tournament, competition)
 
     def _process_competition(self, tournament, competition):
-        for competitor in competition.get('competitors', []):
-            player = self._upsert_player(competitor)
-            if player:
-                self._upsert_scores(tournament, player, competitor)
+        competitors = competition.get('competitors', [])
+        if not competitors:
+            return
 
-    def _upsert_player(self, competitor):
-        espn_id = str(competitor.get('id', ''))
-        if not espn_id:
-            return None
-
-        athlete = competitor.get('athlete', {})
-        display_name = athlete.get('displayName', '')
-        country = athlete.get('flag', {}).get('alt', '')
-
-        # Split "First Last" — handles multi-word first names by taking last word as surname
-        parts = display_name.rsplit(' ', 1)
-        first_name = parts[0] if len(parts) > 1 else ''
-        last_name = parts[-1]
-
-        player, _ = Player.objects.update_or_create(
-            espn_id=espn_id,
-            defaults={
-                'display_name': display_name,
-                'first_name': first_name,
-                'last_name': last_name,
-                'country': country,
-            },
-        )
-        return player
-
-    def _upsert_scores(self, tournament, player, competitor):
-        linescores = competitor.get('linescores', [])
-        score_field = competitor.get('score', '')
-        total_display = score_field if isinstance(score_field, str) else score_field.get('displayValue', '')
-        position = str(competitor.get('order', ''))
-
-        Leaderboard.objects.update_or_create(
-            tournament=tournament,
-            player=player,
-            defaults={
-                'position': position,
-                'total_score_to_par': _parse_score(total_display),
-                'rounds_completed': len(linescores),
-            },
-        )
-
-        for linescore in linescores:
-            round_number = linescore.get('period')
-            if not round_number or round_number > 4:
+        # Bulk upsert players
+        player_rows = []
+        for c in competitors:
+            espn_id = str(c.get('id', ''))
+            if not espn_id:
                 continue
+            athlete = c.get('athlete', {})
+            display_name = athlete.get('displayName', '')
+            parts = display_name.rsplit(' ', 1)
+            player_rows.append(Player(
+                espn_id=espn_id,
+                display_name=display_name,
+                first_name=parts[0] if len(parts) > 1 else '',
+                last_name=parts[-1],
+                country=athlete.get('flag', {}).get('alt', ''),
+            ))
+        Player.objects.bulk_create(
+            player_rows,
+            update_conflicts=True,
+            unique_fields=['espn_id'],
+            update_fields=['display_name', 'first_name', 'last_name', 'country'],
+        )
+        player_map = {p.espn_id: p for p in Player.objects.filter(espn_id__in=[r.espn_id for r in player_rows])}
 
-            round_obj, _ = TournamentRound.objects.get_or_create(
-                tournament=tournament,
-                round_number=round_number,
-            )
+        # Collect round numbers needed
+        round_numbers = set()
+        for c in competitors:
+            for ls in c.get('linescores', []):
+                rn = ls.get('period')
+                if rn and rn <= 4:
+                    round_numbers.add(rn)
+        for rn in round_numbers:
+            TournamentRound.objects.get_or_create(tournament=tournament, round_number=rn)
+        round_map = {r.round_number: r for r in TournamentRound.objects.filter(tournament=tournament)}
 
-            raw_strokes = linescore.get('value')
-            if raw_strokes is None:
-                continue  # placeholder entry for a round not yet played
-
-            hole_scores = linescore.get('linescores', [])
-            thru = len(hole_scores) if hole_scores else None
-
-            PlayerScore.objects.update_or_create(
+        # Bulk upsert leaderboard
+        lb_rows = []
+        for c in competitors:
+            espn_id = str(c.get('id', ''))
+            player = player_map.get(espn_id)
+            if not player:
+                continue
+            score_field = c.get('score', '')
+            total_display = score_field if isinstance(score_field, str) else score_field.get('displayValue', '')
+            lb_rows.append(Leaderboard(
                 tournament=tournament,
                 player=player,
-                round=round_obj,
-                defaults={
-                    'strokes': int(raw_strokes) if raw_strokes is not None else None,
-                    'score_to_par': _parse_score(linescore.get('displayValue', '')),
-                    'thru': thru,
-                },
-            )
+                position=str(c.get('order', '')),
+                total_score_to_par=_parse_score(total_display),
+                rounds_completed=len(c.get('linescores', [])),
+            ))
+        Leaderboard.objects.bulk_create(
+            lb_rows,
+            update_conflicts=True,
+            unique_fields=['tournament', 'player'],
+            update_fields=['position', 'total_score_to_par', 'rounds_completed'],
+        )
+
+        # Bulk upsert player scores
+        score_rows = []
+        for c in competitors:
+            espn_id = str(c.get('id', ''))
+            player = player_map.get(espn_id)
+            if not player:
+                continue
+            for ls in c.get('linescores', []):
+                rn = ls.get('period')
+                if not rn or rn > 4:
+                    continue
+                raw_strokes = ls.get('value')
+                if raw_strokes is None:
+                    continue
+                round_obj = round_map.get(rn)
+                if not round_obj:
+                    continue
+                hole_scores = ls.get('linescores', [])
+                score_rows.append(PlayerScore(
+                    tournament=tournament,
+                    player=player,
+                    round=round_obj,
+                    strokes=int(raw_strokes),
+                    score_to_par=_parse_score(ls.get('displayValue', '')),
+                    thru=len(hole_scores) if hole_scores else None,
+                ))
+        PlayerScore.objects.bulk_create(
+            score_rows,
+            update_conflicts=True,
+            unique_fields=['tournament', 'player', 'round'],
+            update_fields=['strokes', 'score_to_par', 'thru'],
+        )
 
 
 def _parse_date(date_str):

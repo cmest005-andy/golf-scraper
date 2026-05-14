@@ -56,7 +56,7 @@ class Command(BaseCommand):
                     scoreboard_r.raise_for_status()
                     events = scoreboard_r.json().get('events', [])
                     for event in events:
-                        self._process_event(event)
+                        self._process_event(event, skip_venue=True)
                 except Exception as e:
                     self.stdout.write(self.style.WARNING(f'  Skipped ({e})'))
             return
@@ -70,7 +70,7 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('\nScrape complete.'))
 
-    def _process_event(self, event):
+    def _process_event(self, event, skip_venue=False):
         espn_id = str(event['id'])
         name = event.get('name', '')
         season_year = event.get('season', {}).get('year', datetime.now().year)
@@ -99,7 +99,7 @@ class Command(BaseCommand):
         action = 'Created' if created else 'Updated'
         self.stdout.write(f'  [{action}] {name}  (status: {status})')
 
-        if tournament.course is None:
+        if not skip_venue and tournament.course is None:
             try:
                 venue_name = fetch_tournament_venue(name)
                 if venue_name:

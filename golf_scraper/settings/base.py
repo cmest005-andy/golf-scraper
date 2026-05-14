@@ -23,7 +23,7 @@ INSTALLED_APPS = [
 ]
 
 LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/scorecard/'
+LOGIN_REDIRECT_URL = '/leagues/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 MIDDLEWARE = [

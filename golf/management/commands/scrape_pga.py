@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import requests
 from django.conf import settings
@@ -15,37 +15,55 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--backfill',
+            '--season',
             type=int,
-            metavar='WEEKS',
-            help='Also scrape this many past weeks of data',
+            metavar='YEAR',
+            help='Scrape all events for the given season year (e.g. 2026)',
         )
 
     def handle(self, *args, **options):
-        weeks_back = options.get('backfill') or 0
+        season = options.get('season')
 
-        dates_to_fetch = []
-        if weeks_back:
-            today = datetime.now().date()
-            for i in range(1, weeks_back + 1):
-                dates_to_fetch.append(today - timedelta(weeks=i))
-
-        # Past weeks first (oldest → newest), then current
-        for past_date in reversed(dates_to_fetch):
-            self.stdout.write(f'\nFetching week of {past_date} ...')
+        if season:
+            self.stdout.write(f'Fetching {season} PGA Tour schedule (tournament names/dates only — ESPN does not expose historical scores)...')
             try:
                 r = requests.get(
-                    f'{BASE_URL}/scoreboard',
-                    params={'dates': past_date.strftime('%Y%m%d')},
-                    timeout=10,
+                    f'https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/seasons/{season}/types/2/events',
+                    params={'limit': 100},
+                    timeout=15,
                 )
                 r.raise_for_status()
-                events = r.json().get('events', [])
-                self.stdout.write(f'  Found {len(events)} event(s)')
-                for event in events:
-                    self._process_event(event)
+                refs = r.json().get('items', [])
+                self.stdout.write(f'  Found {len(refs)} events')
+                for ref in refs:
+                    espn_id = ref.get('$ref', '').rstrip('/').split('/')[-1].split('?')[0]
+                    if not espn_id:
+                        continue
+                    try:
+                        event_r = requests.get(ref['$ref'], timeout=10)
+                        event_r.raise_for_status()
+                        event = event_r.json()
+                        season_obj = event.get('season') or {}
+                        season_year = season_obj.get('year') if isinstance(season_obj, dict) else season
+                        raw_status = event.get('status', {}).get('type', {}).get('state', 'pre')
+                        status_map = {'pre': Tournament.Status.SCHEDULED, 'in': Tournament.Status.IN_PROGRESS, 'post': Tournament.Status.COMPLETED}
+                        tournament, created = Tournament.objects.update_or_create(
+                            espn_id=espn_id,
+                            defaults={
+                                'name': event.get('name', ''),
+                                'season': season_year or season,
+                                'start_date': _parse_date(event.get('date', '')),
+                                'end_date': _parse_date(event.get('endDate', '')),
+                                'status': status_map.get(raw_status, Tournament.Status.SCHEDULED),
+                            },
+                        )
+                        action = 'Created' if created else 'Updated'
+                        self.stdout.write(f'  [{action}] {event.get("name", espn_id)}')
+                    except Exception as e:
+                        self.stdout.write(self.style.WARNING(f'  Skipped {espn_id} ({e})'))
             except Exception as e:
-                self.stdout.write(self.style.WARNING(f'  Skipped ({e})'))
+                self.stdout.write(self.style.ERROR(f'Failed to fetch season calendar: {e}'))
+            return
 
         self.stdout.write('\nFetching current scoreboard...')
         data = fetch_scoreboard()

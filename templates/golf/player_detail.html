@@ -125,7 +125,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for entry, round_scores in recent_results %}
+                {% for entry, round_scores, missed_cut in recent_results %}
                 <tr>
                     <td>
                         <a href="{% url 'golf:index' %}?tournament={{ entry.tournament.pk }}" class="player-link">
@@ -144,6 +144,8 @@
                             {% elif score.score_to_par == 0 %}<span class="score-even">{{ score.strokes }}</span>
                             {% else %}{{ score.strokes }}
                             {% endif %}
+                        {% elif missed_cut and forloop.counter0 >= 2 %}
+                            <span class="text-muted small">MC</span>
                         {% else %}
                             <span class="text-muted">—</span>
                         {% endif %}

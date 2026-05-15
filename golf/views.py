@@ -205,10 +205,15 @@ def player_detail(request, espn_id):
         tid = entry.tournament_id
         round_numbers = rounds_by_tournament.get(tid, [])
         round_scores = [score_map.get((tid, rn)) for rn in round_numbers]
+        # Detect missed cut: completed tournament has R3+ but player has no R3 score
+        is_completed = entry.tournament.status == Tournament.Status.COMPLETED
+        has_r1 = bool(round_scores[0]) if round_scores else False
+        has_r3 = bool(round_scores[2]) if len(round_scores) > 2 else True
+        missed_cut = is_completed and has_r1 and not has_r3 and len(round_numbers) > 2
         # Pad to max_rounds so columns align
         while len(round_scores) < max_rounds:
             round_scores.append(None)
-        recent_results.append((entry, round_scores))
+        recent_results.append((entry, round_scores, missed_cut))
 
     round_columns = list(range(1, max_rounds + 1))
 

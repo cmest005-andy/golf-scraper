@@ -224,6 +224,25 @@ def player_detail(request, espn_id):
     })
 
 
+def schedule(request):
+    from django.utils import timezone
+    today = timezone.now().date()
+    upcoming = (
+        Tournament.objects
+        .filter(start_date__gte=today, status=Tournament.Status.SCHEDULED)
+        .order_by('start_date')
+    )
+    in_progress = (
+        Tournament.objects
+        .filter(status=Tournament.Status.IN_PROGRESS)
+        .order_by('start_date')
+    )
+    return render(request, 'golf/schedule.html', {
+        'in_progress': in_progress,
+        'upcoming': upcoming,
+    })
+
+
 def leaderboard_api(request):
     tournament_id = request.GET.get('tournament')
 

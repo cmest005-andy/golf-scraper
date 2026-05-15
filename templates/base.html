@@ -225,6 +225,8 @@
                 {% if user.is_authenticated %}
                 <a href="{% url 'golf:index' %}" style="color:var(--gold-light);text-decoration:none;">Leaderboard</a>
                 <span class="nav-sep" style="color:#555;">|</span>
+                <a href="{% url 'golf:schedule' %}" style="color:var(--gold-light);text-decoration:none;">Schedule</a>
+                <span class="nav-sep" style="color:#555;">|</span>
                 <a href="{% url 'fantasy:my_leagues' %}" style="color:var(--gold-light);text-decoration:none;">My Leagues</a>
                 <span class="nav-sep" style="color:#555;">|</span>
                 <a href="{% url 'users:account_settings' %}" style="color:#ccc;text-decoration:none;">{{ user.profile.get_display_name }}</a>
@@ -234,6 +236,8 @@
                 </form>
                 {% else %}
                 <a href="{% url 'golf:index' %}" style="color:var(--gold-light);text-decoration:none;">Leaderboard</a>
+                <span class="nav-sep" style="color:#555;">|</span>
+                <a href="{% url 'golf:schedule' %}" style="color:var(--gold-light);text-decoration:none;">Schedule</a>
                 <span class="nav-sep" style="color:#555;">|</span>
                 <a href="{% url 'login' %}" style="color:var(--gold-light);text-decoration:none;">Sign In</a>
                 <a href="{% url 'users:register' %}" class="btn btn-sm px-2 py-0" style="background:var(--gold);color:#1a1a1a;font-size:.8rem;font-weight:600;">Register</a>

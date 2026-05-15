@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<h1 class="mb-4" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">2026 PGA Tour Schedule</h1>
+
+{% if in_progress %}
+<h2 class="mb-2" style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:var(--green-mid);letter-spacing:.05em;text-transform:uppercase;">This Week</h2>
+<div class="card shadow-sm mb-4">
+    <div class="table-responsive">
+        <table class="table mb-0" style="font-size:.9rem;">
+            <thead>
+                <tr style="background:var(--green-dark);">
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Tournament</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell">Dates</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell">Course</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell text-end">Purse</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in in_progress %}
+                <tr style="border-bottom:1px solid #EAEAE4;">
+                    <td style="padding:.55rem .75rem;font-weight:600;">{{ t.name }}</td>
+                    <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted">{{ t.start_date|date:"M j" }} – {{ t.end_date|date:"M j" }}</td>
+                    <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted">{{ t.course.name|default:"—" }}</td>
+                    <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted text-end">{% if t.purse %}${{ t.purse|floatformat:0 }}{% else %}—{% endif %}</td>
+                    <td style="padding:.55rem .75rem;">
+                        <span class="badge-status badge-in_progress">In Progress</span>
+                        <a href="{% url 'golf:index' %}?tournament={{ t.pk }}" class="btn btn-sm btn-outline-secondary ms-2" style="font-size:.75rem;">Leaderboard</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<h2 class="mb-2" style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:var(--green-mid);letter-spacing:.05em;text-transform:uppercase;">Upcoming</h2>
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table mb-0" style="font-size:.9rem;">
+            <thead>
+                <tr style="background:var(--green-dark);">
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Tournament</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Dates</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell">Course</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;text-align:right;" class="d-none d-md-table-cell">Purse</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in upcoming %}
+                <tr style="border-bottom:1px solid #EAEAE4;{% if forloop.counter == 1 %}font-weight:600;{% endif %}">
+                    <td style="padding:.55rem .75rem;">{{ t.name }}</td>
+                    <td style="padding:.55rem .75rem;white-space:nowrap;" class="text-muted">{{ t.start_date|date:"M j" }} – {{ t.end_date|date:"M j" }}</td>
+                    <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted">{{ t.course.name|default:"—" }}</td>
+                    <td style="padding:.55rem .75rem;text-align:right;" class="d-none d-md-table-cell text-muted">{% if t.purse %}${{ t.purse|floatformat:0 }}{% else %}—{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-muted p-3">No upcoming tournaments found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

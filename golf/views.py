@@ -321,6 +321,7 @@ def leaderboard_api(request):
                 'strokes': score.strokes if score else None,
                 'score_to_par': score.score_to_par if score else None,
                 'thru': score.thru if score else None,
+                'tee_time': score.tee_time.isoformat() if score and score.tee_time else None,
             })
 
         players.append({

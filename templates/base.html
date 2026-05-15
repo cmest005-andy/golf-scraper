@@ -257,10 +257,14 @@
         try {
             document.querySelectorAll('[data-utc]').forEach(el => {
                 const d = new Date(el.dataset.utc);
-                el.textContent = d.toLocaleString(undefined, {
-                    month: 'short', day: 'numeric', year: 'numeric',
-                    hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
-                });
+                if (el.classList.contains('tee-time')) {
+                    el.textContent = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+                } else {
+                    el.textContent = d.toLocaleString(undefined, {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                        hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+                    });
+                }
             });
         } catch (e) {
             console.warn('Timezone conversion failed:', e);
@@ -290,7 +294,14 @@
             }
 
             function formatRoundScore(round, status) {
-                if (!round || round.strokes === null) return '<span class="text-muted">—</span>';
+                if (!round || round.strokes === null) {
+                    if (round && round.tee_time) {
+                        const d = new Date(round.tee_time);
+                        const t = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+                        return `<span class="text-muted tee-time">${t}</span>`;
+                    }
+                    return '<span class="text-muted">—</span>';
+                }
                 const inProgress = round.thru !== null && round.thru < 18;
                 if (inProgress) {
                     const sp = round.score_to_par;

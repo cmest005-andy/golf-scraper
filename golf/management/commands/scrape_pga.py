@@ -130,8 +130,10 @@ class Command(BaseCommand):
             espn_id = str(c.get('id', ''))
             if not espn_id:
                 continue
-            athlete = c.get('athlete', {})
+            athlete = c.get('athlete') or c.get('team') or {}
             display_name = athlete.get('displayName', '')
+            if not display_name:
+                continue
             parts = display_name.rsplit(' ', 1)
             player_rows.append(Player(
                 espn_id=espn_id,

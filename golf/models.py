@@ -119,7 +119,8 @@ class PlayerScore(models.Model):
     position = models.CharField(max_length=10, blank=True)  # e.g. "T1", "2", "CUT"
     strokes = models.IntegerField(null=True, blank=True)
     score_to_par = models.IntegerField(null=True, blank=True)
-    thru = models.IntegerField(null=True, blank=True)  # holes completed in current round
+    thru = models.IntegerField(null=True, blank=True)
+    tee_time = models.DateTimeField(null=True, blank=True)  # holes completed in current round
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

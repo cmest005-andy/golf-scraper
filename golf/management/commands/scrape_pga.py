@@ -1,4 +1,5 @@
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 
 import requests
 from django.conf import settings
@@ -150,13 +151,21 @@ class Command(BaseCommand):
         )
         player_map = {p.espn_id: p for p in Player.objects.filter(espn_id__in=[r.espn_id for r in player_rows])}
 
-        # Collect round numbers needed — only rounds with actual strokes recorded
+        # Fetch tee times from ESPN core API (scoreboard omits them)
+        core_tee_times = _fetch_core_tee_times(tournament.espn_id)
+
+        # Collect round numbers needed — rounds with actual strokes OR a tee time
         round_numbers = set()
         for c in competitors:
+            espn_id_c = str(c.get('id', ''))
             for ls in c.get('linescores', []):
                 rn = ls.get('period')
+                if not rn or rn > 4:
+                    continue
                 raw = ls.get('value')
-                if rn and rn <= 4 and raw is not None and raw > 0:
+                has_strokes = raw is not None and raw > 0
+                has_tee_time = rn in core_tee_times.get(espn_id_c, {})
+                if has_strokes or has_tee_time:
                     round_numbers.add(rn)
         for rn in round_numbers:
             TournamentRound.objects.get_or_create(tournament=tournament, round_number=rn)
@@ -192,12 +201,15 @@ class Command(BaseCommand):
             player = player_map.get(espn_id)
             if not player:
                 continue
+            player_tee_times = core_tee_times.get(espn_id, {})
             for ls in c.get('linescores', []):
                 rn = ls.get('period')
                 if not rn or rn > 4:
                     continue
                 raw_strokes = ls.get('value')
-                if raw_strokes is None:
+                has_strokes = raw_strokes is not None and raw_strokes > 0
+                tee_time = player_tee_times.get(rn)
+                if not has_strokes and not tee_time:
                     continue
                 round_obj = round_map.get(rn)
                 if not round_obj:
@@ -207,15 +219,16 @@ class Command(BaseCommand):
                     tournament=tournament,
                     player=player,
                     round=round_obj,
-                    strokes=int(raw_strokes),
-                    score_to_par=_parse_score(ls.get('displayValue', '')),
+                    strokes=int(raw_strokes) if has_strokes else None,
+                    score_to_par=_parse_score(ls.get('displayValue', '')) if has_strokes else None,
                     thru=len(hole_scores) if hole_scores else None,
+                    tee_time=tee_time,
                 ))
         PlayerScore.objects.bulk_create(
             score_rows,
             update_conflicts=True,
             unique_fields=['tournament', 'player', 'round'],
-            update_fields=['strokes', 'score_to_par', 'thru'],
+            update_fields=['strokes', 'score_to_par', 'thru', 'tee_time'],
         )
 
 
@@ -226,6 +239,62 @@ def _parse_date(date_str):
         return datetime.fromisoformat(date_str.replace('Z', '+00:00')).date()
     except (ValueError, AttributeError):
         return None
+
+
+def _parse_datetime(dt_str):
+    if not dt_str:
+        return None
+    try:
+        return datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _fetch_core_tee_times(espn_id: str) -> dict:
+    """Fetch upcoming-round tee times for all competitors from ESPN core API.
+    Returns {player_espn_id: {round_number: tee_time_datetime}}.
+    Rounds that already have scores are excluded."""
+    try:
+        r = requests.get(
+            f'https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/events/{espn_id}'
+            f'/competitions/{espn_id}/competitors',
+            params={'limit': 200},
+            timeout=15,
+        )
+        r.raise_for_status()
+        items = r.json().get('items', [])
+    except Exception:
+        return {}
+
+    def _fetch_ls(item):
+        pid = item.get('id', '')
+        ls_ref = item.get('linescores', {})
+        if not isinstance(ls_ref, dict):
+            return pid, {}
+        url = ls_ref.get('$ref', '')
+        if not url:
+            return pid, {}
+        try:
+            r2 = requests.get(url, timeout=10)
+            if not r2.ok:
+                return pid, {}
+            tee_map = {}
+            for ls in r2.json().get('items', []):
+                rn = ls.get('period')
+                tt = ls.get('teeTime')
+                # Only include rounds without a score (upcoming rounds)
+                if rn and tt and not (ls.get('value', 0) or 0):
+                    tee_map[rn] = _parse_datetime(tt)
+            return pid, tee_map
+        except Exception:
+            return pid, {}
+
+    result = {}
+    with ThreadPoolExecutor(max_workers=20) as ex:
+        for pid, tee_map in ex.map(_fetch_ls, items):
+            if tee_map:
+                result[pid] = tee_map
+    return result
 
 
 def _parse_score(value):

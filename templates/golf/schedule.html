@@ -15,7 +15,6 @@
                     <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Tournament</th>
                     <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell">Dates</th>
                     <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell">Course</th>
-                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell text-end">Purse</th>
                     <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;"></th>
                 </tr>
             </thead>
@@ -25,7 +24,6 @@
                     <td style="padding:.55rem .75rem;font-weight:600;">{{ t.name }}</td>
                     <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted">{{ t.start_date|date:"M j" }} – {{ t.end_date|date:"M j" }}</td>
                     <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted">{{ t.course.name|default:"—" }}</td>
-                    <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted text-end">{% if t.purse %}${{ t.purse|floatformat:0 }}{% else %}—{% endif %}</td>
                     <td style="padding:.55rem .75rem;">
                         <span class="badge-status badge-in_progress">In Progress</span>
                         <a href="{% url 'golf:index' %}?tournament={{ t.pk }}" class="btn btn-sm btn-outline-secondary ms-2" style="font-size:.75rem;">Leaderboard</a>
@@ -47,7 +45,6 @@
                     <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Tournament</th>
                     <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Dates</th>
                     <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell">Course</th>
-                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;text-align:right;" class="d-none d-md-table-cell">Purse</th>
                 </tr>
             </thead>
             <tbody>
@@ -56,7 +53,6 @@
                     <td style="padding:.55rem .75rem;">{{ t.name }}</td>
                     <td style="padding:.55rem .75rem;white-space:nowrap;" class="text-muted">{{ t.start_date|date:"M j" }} – {{ t.end_date|date:"M j" }}</td>
                     <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted">{{ t.course.name|default:"—" }}</td>
-                    <td style="padding:.55rem .75rem;text-align:right;" class="d-none d-md-table-cell text-muted">{% if t.purse %}${{ t.purse|floatformat:0 }}{% else %}—{% endif %}</td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="4" class="text-muted p-3">No upcoming tournaments found.</td></tr>

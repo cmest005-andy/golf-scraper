@@ -1,6 +1,6 @@
 import logging
-
-from apscheduler.schedulers.background import BackgroundScheduler
+import threading
+import time
 from django.utils import timezone as tz
 
 logger = logging.getLogger(__name__)
@@ -106,14 +106,13 @@ def autopick_expired_picks():
         logger.exception('autopick_expired_picks failed')
 
 
+def _run_loop():
+    while True:
+        autopick_expired_picks()
+        time.sleep(5)
+
+
 def start():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(
-        autopick_expired_picks,
-        'interval',
-        seconds=5,
-        id='autopick_expired',
-        replace_existing=True,
-    )
-    scheduler.start()
-    logger.info('Fantasy scheduler started')
+    print('Fantasy scheduler started', flush=True)
+    t = threading.Thread(target=_run_loop, daemon=True)
+    t.start()

@@ -335,8 +335,8 @@ def draft_room(request, pk):
     odds_map = {o['player_id']: o['win_odds'] for o in odds_qs}
     has_odds = bool(odds_map)
 
-    # Re-sort available by odds when odds exist and no live scores yet
-    if has_odds and not has_round_scores:
+    # Sort by odds when available (best pre-tournament signal); fall back to live scores or world ranking
+    if has_odds:
         def _odds_key(entry):
             try:
                 return int(odds_map.get(entry.player_id, '') or '99999')

@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 from django.core.paginator import Paginator
-from django.db.models import Max, Q
+from django.db.models import Case, IntegerField, Max, Q, Value, When
 from django.db.models.expressions import RawSQL
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -19,7 +19,29 @@ def home(request):
 
 
 def index(request):
-    tournaments = Tournament.objects.order_by('-start_date')
+    current_season = (
+        Tournament.objects
+        .filter(status=Tournament.Status.IN_PROGRESS)
+        .values_list('season', flat=True)
+        .first()
+    ) or (
+        Tournament.objects
+        .aggregate(max_season=Max('season'))['max_season']
+    )
+
+    tournaments = (
+        Tournament.objects
+        .filter(season=current_season)
+        .exclude(status=Tournament.Status.SCHEDULED)
+        .annotate(
+            status_order=Case(
+                When(status=Tournament.Status.IN_PROGRESS, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        )
+        .order_by('status_order', '-start_date')
+    )
 
     tournament_id = request.GET.get('tournament')
     if tournament_id:

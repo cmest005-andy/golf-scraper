@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 
-from .models import Leaderboard, Player, PlayerScore, Tournament, TournamentRound
+from .models import Course, CourseHole, Leaderboard, Player, PlayerScore, Tournament, TournamentRound
 from .scraper.espn import fetch_player_bio, fetch_wikipedia_bio
 
 logger = logging.getLogger(__name__)
@@ -221,6 +221,35 @@ def player_detail(request, espn_id):
         'player': player,
         'recent_results': recent_results,
         'round_columns': round_columns,
+    })
+
+
+def course_detail(request, pk):
+    course = get_object_or_404(Course, pk=pk)
+    holes = list(course.holes.order_by('number'))
+    front = [h for h in holes if h.number <= 9]
+    back  = [h for h in holes if h.number >= 10]
+    front_par     = sum(h.par for h in front)
+    back_par      = sum(h.par for h in back)
+    front_yardage = sum(h.yardage or 0 for h in front)
+    back_yardage  = sum(h.yardage or 0 for h in back)
+    tournaments = (
+        Tournament.objects
+        .filter(course=course)
+        .order_by('-start_date')
+    )
+    return render(request, 'golf/course_detail.html', {
+        'course':         course,
+        'front':          front,
+        'back':           back,
+        'front_par':      front_par,
+        'back_par':       back_par,
+        'front_yardage':  front_yardage,
+        'back_yardage':   back_yardage,
+        'total_par':      front_par + back_par,
+        'total_yardage':  front_yardage + back_yardage,
+        'tournaments':    tournaments,
+        'has_scorecard':  bool(holes),
     })
 
 

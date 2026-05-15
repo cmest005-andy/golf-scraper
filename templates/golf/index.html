@@ -11,7 +11,7 @@
             {{ tournament.name }}
         </h1>
         <span class="text-muted small me-2">{{ tournament.start_date|date:"M j" }} – {{ tournament.end_date|date:"M j, Y" }}</span>
-        {% if tournament.course %}<span class="text-muted small me-2">· {{ tournament.course.name }}</span>{% endif %}
+        {% if tournament.course %}<span class="text-muted small me-2">· <a href="{% url 'golf:course_detail' tournament.course.pk %}" class="text-muted">{{ tournament.course.name }}</a></span>{% endif %}
         <span class="badge-status badge-{{ tournament.status }}">{{ tournament.get_status_display }}</span>
     </div>
     <form method="get" class="d-flex flex-wrap align-items-center gap-2">

@@ -41,11 +41,26 @@ class Course(models.Model):
     country = models.CharField(max_length=100, blank=True)
     par = models.IntegerField(null=True, blank=True)
     yardage = models.IntegerField(null=True, blank=True)
+    wiki_bio = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
+
+class CourseHole(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='holes')
+    number = models.IntegerField()
+    par = models.IntegerField()
+    yardage = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ['course', 'number']
+        ordering = ['number']
+
+    def __str__(self):
+        return f'{self.course.name} — Hole {self.number}'
 
 
 class Tournament(models.Model):

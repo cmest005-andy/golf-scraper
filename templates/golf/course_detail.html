@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}{{ course.name }} — {{ APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'golf:schedule' %}" class="text-muted small" style="text-decoration:none;">← Schedule</a>
+</div>
+
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-4">
+    <div>
+        <h1 class="mb-1" style="font-family:'Barlow Condensed',sans-serif;font-size:2rem;font-weight:700;">{{ course.name }}</h1>
+        <div class="text-muted">
+            {% if course.city %}{{ course.city }}{% if course.state %}, {{ course.state }}{% endif %}{% if course.country %} · {{ course.country }}{% endif %}{% endif %}
+            {% if course.par %}&nbsp;·&nbsp; Par {{ course.par }}{% endif %}
+            {% if course.yardage %}&nbsp;·&nbsp; {{ course.yardage|floatformat:0 }} yards{% endif %}
+        </div>
+    </div>
+</div>
+
+{% if course.wiki_bio %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body" style="font-size:.95rem;line-height:1.7;">
+        {{ course.wiki_bio }}
+    </div>
+</div>
+{% endif %}
+
+{% if has_scorecard %}
+<h2 class="mb-2" style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:var(--green-mid);letter-spacing:.05em;text-transform:uppercase;">Scorecard</h2>
+<div class="card shadow-sm mb-4">
+    <div class="table-responsive">
+        <table class="table mb-0 text-center" style="font-size:.85rem;">
+            <thead>
+                <tr style="background:var(--green-dark);">
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:none;padding:.5rem .5rem;text-align:left;">Hole</th>
+                    {% for h in front %}<th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:none;padding:.5rem .4rem;">{{ h.number }}</th>{% endfor %}
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:none;padding:.5rem .5rem;background:#112b20;">Out</th>
+                    {% for h in back %}<th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:none;padding:.5rem .4rem;">{{ h.number }}</th>{% endfor %}
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:none;padding:.5rem .5rem;background:#112b20;">In</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;border:none;padding:.5rem .5rem;background:#0d2218;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom:1px solid #EAEAE4;">
+                    <td style="text-align:left;padding:.45rem .5rem;font-weight:600;">Par</td>
+                    {% for h in front %}<td style="padding:.45rem .4rem;">{{ h.par }}</td>{% endfor %}
+                    <td style="padding:.45rem .5rem;font-weight:700;background:#f5f5f0;">{{ front_par }}</td>
+                    {% for h in back %}<td style="padding:.45rem .4rem;">{{ h.par }}</td>{% endfor %}
+                    <td style="padding:.45rem .5rem;font-weight:700;background:#f5f5f0;">{{ back_par }}</td>
+                    <td style="padding:.45rem .5rem;font-weight:700;background:#efefea;">{{ total_par }}</td>
+                </tr>
+                {% if front.0.yardage %}
+                <tr>
+                    <td style="text-align:left;padding:.45rem .5rem;font-weight:600;">Yards</td>
+                    {% for h in front %}<td style="padding:.45rem .4rem;color:#555;">{{ h.yardage|default:"—" }}</td>{% endfor %}
+                    <td style="padding:.45rem .5rem;font-weight:700;background:#f5f5f0;">{{ front_yardage }}</td>
+                    {% for h in back %}<td style="padding:.45rem .4rem;color:#555;">{{ h.yardage|default:"—" }}</td>{% endfor %}
+                    <td style="padding:.45rem .5rem;font-weight:700;background:#f5f5f0;">{{ back_yardage }}</td>
+                    <td style="padding:.45rem .5rem;font-weight:700;background:#efefea;">{{ total_yardage }}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if tournaments %}
+<h2 class="mb-2" style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:var(--green-mid);letter-spacing:.05em;text-transform:uppercase;">Tournaments Held Here</h2>
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table mb-0" style="font-size:.9rem;">
+            <thead>
+                <tr style="background:var(--green-dark);">
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Tournament</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Dates</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tournaments %}
+                <tr style="border-bottom:1px solid #EAEAE4;">
+                    <td style="padding:.55rem .75rem;font-weight:600;">{{ t.name }}</td>
+                    <td style="padding:.55rem .75rem;" class="text-muted">{{ t.start_date|date:"M j" }} – {{ t.end_date|date:"M j, Y" }}</td>
+                    <td style="padding:.55rem .75rem;">
+                        <span class="badge-status badge-{{ t.status }}">{{ t.get_status_display }}</span>
+                        {% if t.status != 'scheduled' %}
+                        <a href="{% url 'golf:index' %}?tournament={{ t.pk }}" class="btn btn-sm btn-outline-secondary ms-2" style="font-size:.75rem;">Leaderboard</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

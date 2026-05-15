@@ -241,8 +241,16 @@ def create_draft(request, league_pk):
     if league.commissioner != request.user:
         return redirect('fantasy:league_detail', pk=league_pk)
 
+    from golf.models import Leaderboard
     drafted_ids  = WeeklyDraft.objects.filter(league=league).values_list('tournament_id', flat=True)
-    tournaments  = Tournament.objects.exclude(pk__in=drafted_ids).order_by('-start_date')
+    has_players  = Leaderboard.objects.values_list('tournament_id', flat=True).distinct()
+    tournaments  = (
+        Tournament.objects
+        .filter(status__in=[Tournament.Status.SCHEDULED, Tournament.Status.IN_PROGRESS])
+        .filter(pk__in=has_players)
+        .exclude(pk__in=drafted_ids)
+        .order_by('start_date')
+    )
     error        = None
 
     if request.method == 'POST':

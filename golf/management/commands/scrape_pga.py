@@ -148,12 +148,13 @@ class Command(BaseCommand):
         )
         player_map = {p.espn_id: p for p in Player.objects.filter(espn_id__in=[r.espn_id for r in player_rows])}
 
-        # Collect round numbers needed
+        # Collect round numbers needed — only rounds with actual strokes recorded
         round_numbers = set()
         for c in competitors:
             for ls in c.get('linescores', []):
                 rn = ls.get('period')
-                if rn and rn <= 4:
+                raw = ls.get('value')
+                if rn and rn <= 4 and raw is not None and raw > 0:
                     round_numbers.add(rn)
         for rn in round_numbers:
             TournamentRound.objects.get_or_create(tournament=tournament, round_number=rn)

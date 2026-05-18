@@ -34,10 +34,11 @@
         .site-nav .container {
             display: flex;
             align-items: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             min-height: 56px;
             padding-top: .25rem;
             padding-bottom: .25rem;
+            overflow: hidden;
         }
         .site-nav .nav-toggler {
             background: none;
@@ -95,9 +96,17 @@
             display: flex;
             align-items: center;
             padding: 0 1rem;
+            min-width: 0;
+            flex-shrink: 1;
         }
         .site-nav .brand span {
             color: var(--gold-light);
+            white-space: nowrap;
+        }
+        .site-nav .brand-short { display: none; }
+        @media (max-width: 767px) {
+            .site-nav .brand-full  { display: none; }
+            .site-nav .brand-short { display: inline; }
         }
 
         /* ── Score colours ── */
@@ -217,7 +226,7 @@
 <body>
     <nav class="site-nav mb-4">
         <div class="container">
-            <a class="brand" href="{% url 'golf:home' %}"><img src="{% static 'img/logo.png' %}" alt="{{ APP_NAME }}" style="height:36px;width:auto;vertical-align:middle;margin-right:8px;"><span>{{ APP_NAME }}</span></a>
+            <a class="brand" href="{% url 'golf:home' %}"><img src="{% static 'img/logo.png' %}" alt="{{ APP_NAME }}" style="height:36px;width:auto;vertical-align:middle;margin-right:8px;"><span class="brand-full">{{ APP_NAME }}</span><span class="brand-short">PB Golf Fantasy League</span></a>
             <button class="nav-toggler" id="nav-toggle" aria-label="Menu">
                 <span></span><span></span><span></span>
             </button>

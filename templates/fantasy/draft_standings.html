@@ -6,21 +6,41 @@
 <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-4">
     <div>
         <h1 class="mb-0" style="font-family:'Barlow Condensed',sans-serif;font-size:1.8rem;font-weight:700;">
-            {{ league.name }} — Team Scorecard
+            {{ league.name }} —
+            {% if draft.tournament.status == 'completed' %}Final Results{% else %}Team Scorecard{% endif %}
         </h1>
-        <span class="text-muted small">{{ draft.tournament.name }} &nbsp;·&nbsp; {{ draft.tournament.start_date|date:"M j" }}–{{ draft.tournament.end_date|date:"M j, Y" }}</span>
+        <span class="text-muted small">
+            {{ draft.tournament.name }} &nbsp;·&nbsp; {{ draft.tournament.start_date|date:"M j" }}–{{ draft.tournament.end_date|date:"M j, Y" }}
+            {% if draft.tournament.status == 'completed' %}
+            &nbsp;·&nbsp; <span style="color:var(--gold);font-weight:700;">Tournament Complete</span>
+            {% endif %}
+        </span>
     </div>
     <a href="{% url 'fantasy:league_detail' league.pk %}" class="btn btn-sm btn-outline-secondary">← League</a>
 </div>
 
 {% for team in standings %}
+{% if draft.tournament.status == 'completed' and forloop.first %}
+<div class="card mb-3" style="border:2px solid var(--gold);box-shadow:0 0 12px rgba(212,175,55,.25);">
+    <div class="card-header d-flex align-items-center justify-content-between py-2 px-3"
+         style="background:linear-gradient(135deg,#1a3a1a 0%,#2d5a2d 100%);">
+        <div class="d-flex align-items-center gap-2">
+            <span style="font-size:1.1rem;line-height:1;">🏆</span>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:700;color:var(--gold);">{{ team.member.display }}</span>
+        </div>
+        <span style="font-family:'Barlow Condensed',sans-serif;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);opacity:.85;">Champion</span>
+    </div>
+{% else %}
 <div class="card shadow-sm mb-3">
     <div class="card-header d-flex align-items-center justify-content-between py-2 px-3" style="background:var(--green-dark);">
         <div class="d-flex align-items-center gap-2">
-            <span style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:var(--gold);min-width:1.5rem;">{{ forloop.counter }}</span>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:var(--gold);min-width:1.5rem;">
+                {% if forloop.counter == 2 %}2nd{% elif forloop.counter == 3 %}3rd{% else %}{{ forloop.counter }}th{% endif %}
+            </span>
             <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:#fff;">{{ team.member.display }}</span>
         </div>
     </div>
+{% endif %}
     <div class="card-body p-0">
         <table class="table leaderboard mb-0">
             <thead>

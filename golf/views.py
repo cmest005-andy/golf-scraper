@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 
-from .models import Course, CourseHole, Leaderboard, Player, PlayerScore, Tournament, TournamentRound
+from .models import Course, CourseHole, Leaderboard, NewsArticle, Player, PlayerScore, Tournament, TournamentRound
 from .scraper.espn import fetch_player_bio, fetch_wikipedia_bio
 
 logger = logging.getLogger(__name__)
@@ -353,3 +353,21 @@ def last_updated_api(request):
     ts = result.isoformat() if result else None
     logger.info('Poll from %s — last_updated: %s', request.META.get('REMOTE_ADDR'), ts)
     return JsonResponse({'last_updated': ts})
+
+
+def news(request):
+    articles = NewsArticle.objects.filter(archived=False).order_by('-published_at')
+    return render(request, 'golf/news.html', {
+        'articles': articles,
+        'page_title': 'PGA Tour News',
+    })
+
+
+def news_archive(request):
+    archived_qs = NewsArticle.objects.filter(archived=True).order_by('-published_at')
+    paginator = Paginator(archived_qs, 12)
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+    return render(request, 'golf/news_archive.html', {
+        'page_obj': page_obj,
+        'page_title': 'News Archive',
+    })

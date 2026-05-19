@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Course, Leaderboard, Odds, Player, PlayerScore, Tournament, TournamentRound
+
+from .models import Course, Leaderboard, NewsArticle, Odds, Player, PlayerScore, Tournament, TournamentRound
 
 
 @admin.register(Player)
@@ -49,3 +50,13 @@ class OddsAdmin(admin.ModelAdmin):
     list_display = ['player', 'tournament', 'bookmaker', 'win_odds', 'timestamp']
     list_filter = ['tournament', 'bookmaker']
     search_fields = ['player__display_name']
+
+
+@admin.register(NewsArticle)
+class NewsArticleAdmin(admin.ModelAdmin):
+    list_display = ('title', 'source', 'published_at', 'archived', 'created_at')
+    list_filter = ('source', 'archived')
+    search_fields = ('title', 'summary', 'source')
+    list_editable = ('archived',)
+    ordering = ('-published_at',)
+    readonly_fields = ('created_at',)

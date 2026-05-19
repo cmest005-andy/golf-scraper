@@ -170,3 +170,20 @@ class Odds(models.Model):
 
     def __str__(self):
         return f"{self.player} - {self.tournament} ({self.bookmaker})"
+
+
+class NewsArticle(models.Model):
+    title = models.CharField(max_length=500)
+    summary = models.TextField(blank=True, default='')
+    image_url = models.URLField(max_length=1000, blank=True, default='')
+    article_url = models.URLField(max_length=1000, unique=True)
+    source = models.CharField(max_length=100, default='ESPN')
+    published_at = models.DateTimeField(null=True, blank=True)
+    archived = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-published_at']
+
+    def __str__(self):
+        return f"{self.source} — {self.title[:80]}"

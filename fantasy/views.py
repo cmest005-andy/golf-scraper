@@ -107,6 +107,16 @@ def league_detail(request, pk):
             teams.append({'member': member, 'picks': pick_data, 'team_score': team_score})
         draft_rosters[draft.pk] = teams
 
+    # Build sorted final standings for completed tournaments
+    draft_final_standings = {}
+    for draft in drafts:
+        if draft.tournament.status == Tournament.Status.COMPLETED:
+            teams = draft_rosters.get(draft.pk, [])
+            draft_final_standings[draft.pk] = sorted(
+                teams,
+                key=lambda t: t['team_score'] if t['team_score'] is not None else 9999,
+            )
+
     from django.utils import timezone as tz
     now = tz.now()
     today = datetime.date.today()
@@ -147,6 +157,7 @@ def league_detail(request, pk):
         'my_membership':          members.filter(user=request.user).first(),
         'active_draft':           active_draft,
         'active_draft_total_picks': active_draft.picks.count() if active_draft else 0,
+        'draft_final_standings':  draft_final_standings,
     })
 
 

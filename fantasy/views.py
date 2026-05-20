@@ -273,7 +273,7 @@ def create_draft(request, league_pk):
                     fetch_rankings_from_url(owgr_url)
                 except _req.RequestException:
                     pass  # non-fatal — draft still created
-            return redirect('fantasy:draft_room', pk=draft.pk)
+            return redirect('fantasy:league_detail', pk=league_pk)
 
     return render(request, 'fantasy/create_draft.html', {
         'league': league,

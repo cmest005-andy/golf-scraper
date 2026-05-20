@@ -31,7 +31,7 @@ _USER_AGENT = (
 #   "14 Rory McIlroy ..."
 # Group 1 → rank (integer string)
 # Group 2 → player display name (two or more Title-cased words)
-_RANKING_RE = re.compile(r"^(\d+)\s+([A-Z][a-zA-Z-.]+(?:\s[A-Z][a-zA-Z-.]+)+)")
+_RANKING_RE = re.compile(r"^(\d+)\s+([A-Z][a-zA-Z-.]+(?:\s[a-zA-Z][a-zA-Z-.]+)+)")
 
 # OWGR name → ESPN display_name for known mismatches
 _NAME_MAP = {

@@ -264,6 +264,14 @@ def create_draft(request, league_pk):
                 league=league, tournament=tournament,
                 draft_time=draft_time, pick_time_limit=pick_time_limit,
             )
+            owgr_url = request.POST.get('owgr_url', '').strip()
+            if owgr_url:
+                try:
+                    from golf.rankings import fetch_rankings_from_url
+                    import requests as _req
+                    fetch_rankings_from_url(owgr_url)
+                except _req.RequestException:
+                    pass  # non-fatal — draft still created
             return redirect('fantasy:draft_room', pk=draft.pk)
 
     return render(request, 'fantasy/create_draft.html', {

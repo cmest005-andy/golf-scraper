@@ -86,10 +86,10 @@
                                     <span class="text-muted">Draft Date:</span>
                                     {% if draft.draft_time %}
                                     <span style="color:var(--gold);">{{ draft.draft_time|date:"N j, Y g:i A" }}</span>
-                                    {% if is_commissioner %}<a href="{% url 'fantasy:set_draft_time' draft.pk %}" class="ms-1 text-muted" style="font-size:.7rem;">Edit</a>{% endif %}
+                                    {% if is_commissioner and draft.status == 'scheduled' %}<a href="{% url 'fantasy:set_draft_time' draft.pk %}" class="ms-1 text-muted" style="font-size:.7rem;">Edit</a>{% endif %}
                                     {% else %}
                                     <span class="text-muted">TBD</span>
-                                    {% if is_commissioner %}<a href="{% url 'fantasy:set_draft_time' draft.pk %}" class="ms-1 text-muted" style="font-size:.7rem;">Set</a>{% endif %}
+                                    {% if is_commissioner and draft.status == 'scheduled' %}<a href="{% url 'fantasy:set_draft_time' draft.pk %}" class="ms-1 text-muted" style="font-size:.7rem;">Set</a>{% endif %}
                                     {% endif %}
                                 </div>
                             </div>

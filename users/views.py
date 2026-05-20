@@ -28,11 +28,19 @@ def account_settings(request):
 
     if request.method == 'POST':
         display_name = request.POST.get('display_name', '').strip()
+        email        = request.POST.get('email', '').strip()
+        phone        = request.POST.get('phone', '').strip()
         if len(display_name) > 100:
             error = 'Display name must be 100 characters or fewer.'
+        elif len(phone) > 20:
+            error = 'Phone number must be 20 characters or fewer.'
         else:
             profile.display_name = display_name
+            profile.phone        = phone
             profile.save()
+            if email:
+                request.user.email = email
+                request.user.save(update_fields=['email'])
             saved = True
 
     return render(request, 'users/account_settings.html', {

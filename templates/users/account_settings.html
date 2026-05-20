@@ -25,6 +25,17 @@
                                placeholder="{{ user.username }}">
                         <div class="form-text text-muted" style="font-size:.75rem;">Shown instead of your username across the app. Leave blank to use your username.</div>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Email <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="email" name="email" class="form-control form-control-sm"
+                               value="{{ user.email }}">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold">Phone <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="tel" name="phone" class="form-control form-control-sm"
+                               value="{{ profile.phone }}" maxlength="20"
+                               placeholder="+1 555 000 0000">
+                    </div>
                     <button type="submit" class="btn btn-sm w-100" style="background:var(--green-dark);color:#fff;">Save</button>
                 </form>
             </div>

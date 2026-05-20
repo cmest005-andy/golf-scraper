@@ -73,13 +73,14 @@ def league_detail(request, pk):
     drafts          = WeeklyDraft.objects.filter(league=league).select_related('tournament').order_by('-tournament__start_date')
     is_commissioner = league.commissioner == request.user
 
-    drafted_ids      = drafts.values_list('tournament_id', flat=True)
-    can_create_draft = is_commissioner and Tournament.objects\
+    drafted_ids        = drafts.values_list('tournament_id', flat=True)
+    has_active_draft   = drafts.filter(status__in=('open', 'locked')).exists()
+    can_create_draft   = is_commissioner and not has_active_draft and Tournament.objects\
         .filter(status__in=[Tournament.Status.SCHEDULED, Tournament.Status.IN_PROGRESS])\
         .exclude(pk__in=drafted_ids)\
         .filter(end_date__gte=datetime.date.today())\
         .exists()
-    show_invite_code = not drafts.filter(status__in=('open', 'locked')).exists()
+    show_invite_code   = not has_active_draft
 
     draft_rosters = {}
     for draft in drafts:

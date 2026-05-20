@@ -31,25 +31,27 @@ _USER_AGENT = (
 #   "14 Rory McIlroy ..."
 # Group 1 → rank (integer string)
 # Group 2 → player display name (two or more Title-cased words)
-_RANKING_RE = re.compile(r"^(\d+)\s+([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)+)")
+_RANKING_RE = re.compile(r"^(\d+)\s+([A-Z][a-zA-Z-]+(?:\s[A-Z][a-zA-Z-]+)+)")
 
 # OWGR name → ESPN display_name for known mismatches
 _NAME_MAP = {
     'Seungyul Noh':       'S.Y. Noh',
     'Rasmus Hojgaard':    'Rasmus Højgaard',
-    'Rasmus Neergaard':   'Rasmus Neergaard Højgaard',
     'John Keefer':        'Johnny Keefer',
     'McClure Meissner':   'Mac Meissner',
     'Thorbjorn Olesen':   'Thorbjørn Olesen',
     'Vincent Whaley':     'Vince Whaley',
     'Adrien Dumont':      'Adrien Dumont de Chassart',
-    'Zachary Bauchou':    'Zac Bauchou',
+    'Zachary Bauchou':    'Zach Bauchou',
+    'Richard Hoey':      'Rico Hoey',
     'Marty Dou Zecheng':  'Zecheng Dou',
     'Seamus Power':       'Séamus Power',
     'Cameron Davis':      'Cam Davis',
     'Kristoffer Ventura': 'Kristoffer Reitan',
     'William Gordon':     'Will Gordon',
     'Fabian Gomez':       'Fabián Gómez',
+    'Kyoung-Hoon Lee':   'K.H. Lee',
+    'Chun-an Yu':        'Kevin Yu',
 }
 
 

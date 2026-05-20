@@ -47,7 +47,7 @@ _NAME_MAP = {
     'Marty Dou Zecheng':  'Zecheng Dou',
     'Seamus Power':       'Séamus Power',
     'Cameron Davis':      'Cam Davis',
-    'Kristoffer Ventura': 'Kristoffer Reitan',
+    'Kristoffer Ventura': 'Kris Ventura',
     'William Gordon':     'Will Gordon',
     'Fabian Gomez':       'Fabián Gómez',
     'Kyoung-Hoon Lee':   'K.H. Lee',

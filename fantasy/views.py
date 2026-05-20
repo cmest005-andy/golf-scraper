@@ -320,12 +320,17 @@ def draft_room(request, pk):
     # Players available to pick (in tournament field, not yet taken)
     taken_ids = draft.picks.values_list('player_id', flat=True)
     has_round_scores = PlayerScore.objects.filter(tournament=draft.tournament).exists()
+    from django.db.models.functions import Coalesce
+    from django.db.models import Value, IntegerField
     available = (
         Leaderboard.objects
         .filter(tournament=draft.tournament)
         .exclude(player_id__in=taken_ids)
         .select_related('player')
-        .order_by('total_score_to_par' if has_round_scores else 'player__world_ranking')
+        .order_by(
+            'total_score_to_par' if has_round_scores
+            else Coalesce('player__world_ranking', Value(9999, output_field=IntegerField()))
+        )
     )
 
     # Odds map: player_id → win_odds string (majors); fall back to world ranking

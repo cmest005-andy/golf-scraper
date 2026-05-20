@@ -77,7 +77,6 @@
                 {% if drafts %}
                 <ul class="list-unstyled mb-0">
                     {% for draft in drafts %}
-                    {% with meta=draft_meta|dictlookup:draft.pk %}
                     <li class="py-2 border-bottom">
                         <div class="d-flex align-items-center justify-content-between gap-2">
                             <div>
@@ -103,7 +102,7 @@
                                 </span>
                                 {% endif %}
                                 {% if draft.status != 'scheduled' %}
-                                <a href="{% url 'fantasy:draft_standings' draft.pk %}" class="btn btn-sm btn-outline-secondary">Team Scorecard</a>
+                                <a href="{% url 'fantasy:draft_standings' draft.pk %}" class="btn btn-sm btn-outline-secondary">{% if draft.tournament.status == 'completed' %}Final Results{% else %}Team Scorecard{% endif %}</a>
                                 {% endif %}
                             </div>
                         </div>
@@ -125,7 +124,7 @@
                                 {% for team in final %}
                                 <tr style="border-bottom:1px solid #f0f0f0;{% if forloop.first %}background:#fffdf0;{% endif %}">
                                     <td style="padding:.35rem .4rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;color:{% if forloop.first %}var(--gold){% else %}#aaa{% endif %};">
-                                        {% if forloop.first %}1st{% elif forloop.counter == 2 %}2nd{% elif forloop.counter == 3 %}3rd{% else %}{{ forloop.counter }}th{% endif %}
+                                        {% if forloop.first %}1st{% elif forloop.counter == 2 %}2nd{% elif forloop.counter == 3 %}3rd{% elif forloop.counter == 4 %}4th{% else %}{{ forloop.counter }}th{% endif %}
                                     </td>
                                     <td style="padding:.35rem .4rem;font-weight:{% if forloop.first %}700{% else %}500{% endif %};">
                                         {% if forloop.first %}🏆 {% endif %}{{ team.member.display }}
@@ -196,7 +195,6 @@
 
                         {% endif %}
                     </li>
-                    {% endwith %}
                     {% endfor %}
                 </ul>
                 {% else %}

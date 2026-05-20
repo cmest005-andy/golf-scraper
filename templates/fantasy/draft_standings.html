@@ -35,7 +35,7 @@
     <div class="card-header d-flex align-items-center justify-content-between py-2 px-3" style="background:var(--green-dark);">
         <div class="d-flex align-items-center gap-2">
             <span style="font-family:'Barlow Condensed',sans-serif;font-size:1rem;font-weight:700;color:var(--gold);min-width:1.5rem;">
-                {% if forloop.counter == 2 %}2nd{% elif forloop.counter == 3 %}3rd{% else %}{{ forloop.counter }}th{% endif %}
+                {% if forloop.counter == 2 %}2nd{% elif forloop.counter == 3 %}3rd{% elif forloop.counter == 4 %}4th{% else %}{{ forloop.counter }}th{% endif %}
             </span>
             <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:#fff;">{{ team.member.display }}</span>
         </div>

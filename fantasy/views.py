@@ -74,17 +74,20 @@ def league_detail(request, pk):
     is_commissioner = league.commissioner == request.user
 
     drafted_ids      = drafts.values_list('tournament_id', flat=True)
-    can_create_draft = is_commissioner and Tournament.objects.exclude(pk__in=drafted_ids).filter(end_date__gte=datetime.date.today()).exists()
+    can_create_draft = is_commissioner and Tournament.objects\
+        .filter(status__in=[Tournament.Status.SCHEDULED, Tournament.Status.IN_PROGRESS])\
+        .exclude(pk__in=drafted_ids)\
+        .filter(end_date__gte=datetime.date.today())\
+        .exists()
     show_invite_code = not drafts.filter(status__in=('open', 'locked')).exists()
 
-    from golf.models import Leaderboard as LB
     draft_rosters = {}
     for draft in drafts:
         order = list(draft.order.select_related('member__user', 'member__user__profile').order_by('position'))
         if not order:
             continue
         has_scores = PlayerScore.objects.filter(tournament=draft.tournament).exists()
-        lb_map = {e.player_id: e.total_score_to_par for e in LB.objects.filter(tournament=draft.tournament)} if has_scores else {}
+        lb_map = {e.player_id: e.total_score_to_par for e in Leaderboard.objects.filter(tournament=draft.tournament)} if has_scores else {}
         all_picks = DraftPick.objects.filter(draft=draft).select_related('player').order_by('pick_number')
         by_member = {}
         for pick in all_picks:
@@ -114,12 +117,8 @@ def league_detail(request, pk):
             teams = draft_rosters.get(draft.pk, [])
             draft_final_standings[draft.pk] = sorted(
                 teams,
-                key=lambda t: t['team_score'] if t['team_score'] is not None else 9999,
+                key=lambda t: t['team_score'] if t['team_score'] is not None else float('inf'),
             )
-
-    from django.utils import timezone as tz
-    now = tz.now()
-    today = datetime.date.today()
 
     # Any open draft shows the banner (lobby or in-progress)
     active_draft = next(
@@ -127,31 +126,12 @@ def league_detail(request, pk):
         None
     )
 
-    draft_meta = {}
-    for draft in drafts:
-        if draft.draft_time:
-            lobby_open    = draft.draft_time - datetime.timedelta(hours=1)
-            local_dt      = tz.localtime(draft.draft_time)
-            draft_meta[draft.pk] = {
-                'is_draft_day':    local_dt.date() == today,
-                'lobby_is_open':   now >= lobby_open,
-                'lobby_open_time': lobby_open,
-                'draft_started':   now >= draft.draft_time,
-            }
-        else:
-            draft_meta[draft.pk] = {
-                'is_draft_day': False, 'lobby_is_open': False,
-                'lobby_open_time': None, 'draft_started': False,
-            }
-
     return render(request, 'fantasy/league_detail.html', {
         'league': league,
         'members': members,
         'drafts': drafts,
         'is_commissioner': is_commissioner,
-        'today': today,
         'draft_rosters': draft_rosters,
-        'draft_meta': draft_meta,
         'can_create_draft': can_create_draft,
         'show_invite_code': show_invite_code,
         'my_membership':          members.filter(user=request.user).first(),
@@ -714,10 +694,21 @@ def draft_standings(request, pk):
     max_rounds = max((rn for _, rn in round_map), default=4) if round_map else 4
     round_numbers = list(range(1, max_rounds + 1))
 
+    # Pre-fetch ALL picks for this draft in one query, grouped by member_id
+    all_picks_qs = (
+        DraftPick.objects
+        .filter(draft=draft)
+        .select_related('player')
+        .order_by('pick_number')
+    )
+    picks_by_member_id: dict = {}
+    for _pick in all_picks_qs:
+        picks_by_member_id.setdefault(_pick.member_id, []).append(_pick)
+
     standings = []
-    for order in draft.order.select_related('member__user'):
+    for order in draft.order.select_related('member__user', 'member__user__profile'):
         member = order.member
-        picks  = draft.picks.filter(member=member).select_related('player').order_by('pick_number')
+        picks  = picks_by_member_id.get(member.pk, [])
         team_score = None
         players = []
 
@@ -753,7 +744,7 @@ def draft_standings(request, pk):
             'team_score':  team_score,
         })
 
-    standings.sort(key=lambda x: x['team_score'] if x['team_score'] is not None else 9999)
+    standings.sort(key=lambda x: x['team_score'] if x['team_score'] is not None else float('inf'))
 
     return render(request, 'fantasy/draft_standings.html', {
         'draft':         draft,

@@ -180,11 +180,22 @@ class Command(BaseCommand):
             action='store_true',
             help='Print email content without sending.',
         )
+        parser.add_argument(
+            '--test',
+            type=str,
+            metavar='EMAIL',
+            help='Send a sample email to the given address to verify SendGrid is working.',
+        )
 
     def handle(self, *args, **options):
-        dry_run = options['dry_run']
-        today   = timezone.localdate()
+        dry_run  = options['dry_run']
+        test_email = options.get('test')
+        today    = timezone.localdate()
         app_name = settings.APP_NAME
+
+        if test_email:
+            self._send_test(test_email, app_name)
+            return
 
         active_drafts = (
             WeeklyDraft.objects
@@ -263,6 +274,46 @@ class Command(BaseCommand):
             msg.attach_alternative(html_body, 'text/html')
             msg.send()
             self.stdout.write(self.style.SUCCESS(f"  Sent to {len(recipients)} recipient(s)."))
+
+    def _send_test(self, email, app_name):
+        standings = [
+            {'member_name': 'Andy',  'team_score': -8, 'picks': [
+                {'player_name': 'Scottie Scheffler', 'score_to_par': -5},
+                {'player_name': 'Rory McIlroy',      'score_to_par': -3},
+            ]},
+            {'member_name': 'Chris', 'team_score': -4, 'picks': [
+                {'player_name': 'Xander Schauffele',  'score_to_par': -4},
+                {'player_name': 'Jon Rahm',            'score_to_par': 0},
+            ]},
+            {'member_name': 'Mike',  'team_score': 2, 'picks': [
+                {'player_name': 'Patrick Cantlay',    'score_to_par': 1},
+                {'player_name': 'Tony Finau',          'score_to_par': 1},
+            ]},
+        ]
+        commentary = _build_commentary(standings, 'The Memorial Tournament', 'Round 2 Recap', False)
+        subject    = f"⛳ {app_name} | Test League — Round 2 Recap"
+        context    = {
+            'app_name':              app_name,
+            'league_name':           'Test League',
+            'tournament_name':       'The Memorial Tournament',
+            'round_label':           'Round 2 Recap',
+            'standings':             standings,
+            'commentary_paragraphs': commentary,
+            'is_final':              False,
+            'winner_name':           '',
+            'subject':               subject,
+        }
+        from django.template.loader import render_to_string
+        html_body = render_to_string('email/daily_update.html', context)
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=self._plain_text(standings, commentary, 'The Memorial Tournament', 'Round 2 Recap'),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email],
+        )
+        msg.attach_alternative(html_body, 'text/html')
+        msg.send()
+        self.stdout.write(self.style.SUCCESS(f"Test email sent to {email}"))
 
     @staticmethod
     def _plain_text(standings, commentary, tournament_name, round_label):

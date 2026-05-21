@@ -175,10 +175,12 @@
                         Available Players
                         <span class="text-muted fw-normal" style="font-size:.7rem;">{% if has_odds %}Odds{% else %}World Ranking{% endif %}</span>
                     </h6>
-                    <div style="max-height:420px;overflow-y:auto;">
+                    <input type="search" id="avail-search" placeholder="Search player…" class="form-control form-control-sm mb-2" autocomplete="off">
+                    <div style="max-height:400px;overflow-y:auto;">
                         {% for entry in available %}
                         <div class="avail-row d-flex align-items-center justify-content-between py-1 border-bottom"
-                             data-player-id="{{ entry.player.pk }}">
+                             data-player-id="{{ entry.player.pk }}"
+                             data-name="{{ entry.player.display_name|lower }}">
                             <span class="small">{{ entry.player.display_name }}</span>
                             <span class="text-muted small">
                                 {% if has_odds %}{{ odds_map|get_odds:entry.player_id }}
@@ -381,12 +383,25 @@ if (confirmBtn) {
     });
 }
 
-// Search filter within pick list
+// Search filter within pick list (my-turn panel)
 const pickSearch = document.getElementById('pick-search');
 if (pickSearch) {
     pickSearch.addEventListener('input', () => {
         const term = pickSearch.value.toLowerCase();
         document.querySelectorAll('.pick-row').forEach(row => {
+            if (row.dataset.picked) return;
+            const name = row.dataset.name || '';
+            row.style.display = (!term || name.startsWith(term) || name.includes(' ' + term)) ? '' : 'none';
+        });
+    });
+}
+
+// Search filter within available list (waiting panel)
+const availSearch = document.getElementById('avail-search');
+if (availSearch) {
+    availSearch.addEventListener('input', () => {
+        const term = availSearch.value.toLowerCase();
+        document.querySelectorAll('.avail-row').forEach(row => {
             if (row.dataset.picked) return;
             const name = row.dataset.name || '';
             row.style.display = (!term || name.startsWith(term) || name.includes(' ' + term)) ? '' : 'none';

@@ -297,7 +297,7 @@ function renderTeamDetail() {
         const tr   = document.createElement('tr');
         if (pick) {
             tr.innerHTML =
-                '<td class="text-muted small">' + pick.pick_number + '</td>' +
+                '<td class="text-muted small">' + (i + 1) + '</td>' +
                 '<td class="small fw-semibold">' + escHtml(pick.player_name) + '</td>' +
                 '<td class="text-end text-muted small">' + escHtml(pick.odds || '—') + '</td>';
         } else {

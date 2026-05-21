@@ -200,7 +200,7 @@ class Command(BaseCommand):
         active_drafts = (
             WeeklyDraft.objects
             .filter(
-                status=WeeklyDraft.Status.OPEN,
+                status__in=[WeeklyDraft.Status.OPEN, WeeklyDraft.Status.LOCKED],
                 tournament__status=Tournament.Status.IN_PROGRESS,
             )
             .select_related('league', 'tournament', 'league__commissioner')
@@ -215,10 +215,11 @@ class Command(BaseCommand):
             tournament = draft.tournament
             is_final   = today >= tournament.end_date
 
-            # Determine current round label
+            # Determine current round — use highest round with actual scores
+            from golf.models import PlayerScore
             latest_round = (
                 TournamentRound.objects
-                .filter(tournament=tournament)
+                .filter(tournament=tournament, scores__isnull=False)
                 .order_by('-round_number')
                 .first()
             )

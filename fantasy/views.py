@@ -559,7 +559,7 @@ def draft_state_api(request, pk):
         .values('id', 'user__username', 'text', 'is_system', 'created_at')
     )
     for m in messages:
-        m['created_at'] = m['created_at'].strftime('%H:%M')
+        m['created_at'] = m['created_at'].isoformat()
 
     return JsonResponse({
         'status':                 draft.status,
@@ -592,7 +592,7 @@ def send_message(request, pk):
         'id': msg.pk,
         'username': request.user.username,
         'text': msg.text,
-        'created_at': msg.created_at.strftime('%H:%M'),
+        'created_at': msg.created_at.isoformat(),
     })
 
 

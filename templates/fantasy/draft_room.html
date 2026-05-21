@@ -634,10 +634,14 @@ if (pauseBtn) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
+    const renderedIds = new Set();
+
     function appendMessages(msgs) {
         if (!msgs.length) return;
         const atBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 40;
         msgs.forEach(m => {
+            if (renderedIds.has(m.id)) return;
+            renderedIds.add(m.id);
             lastMsgId = Math.max(lastMsgId, m.id);
             window._lastMsgId = lastMsgId;
             if (m.is_system) {

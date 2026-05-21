@@ -387,6 +387,7 @@ if (pickSearch) {
     pickSearch.addEventListener('input', () => {
         const term = pickSearch.value.toLowerCase();
         document.querySelectorAll('.pick-row').forEach(row => {
+            if (row.dataset.picked) return;
             const name = row.dataset.name || '';
             row.style.display = (!term || name.startsWith(term) || name.includes(' ' + term)) ? '' : 'none';
         });
@@ -547,7 +548,10 @@ if (pauseBtn) {
     function hidePickedPlayers(picks) {
         const pickedIds = new Set(picks.map(p => String(p.player_id)));
         document.querySelectorAll('.pick-row, .avail-row').forEach(row => {
-            if (pickedIds.has(String(row.dataset.playerId))) row.style.display = 'none';
+            if (pickedIds.has(String(row.dataset.playerId))) {
+                row.style.display = 'none';
+                row.dataset.picked = '1';
+            }
         });
     }
 

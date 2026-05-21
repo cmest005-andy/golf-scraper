@@ -94,6 +94,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ESPN_API_BASE_URL = config('ESPN_API_BASE_URL', default='https://site.api.espn.com/apis/site/v2/sports/golf/pga')
 APP_NAME = config('APP_NAME', default='Fantasy Golf App')
 
+EMAIL_BACKEND      = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST         = 'smtp.sendgrid.net'
+EMAIL_PORT         = 587
+EMAIL_USE_TLS      = True
+EMAIL_HOST_USER    = 'apikey'
+EMAIL_HOST_PASSWORD = config('SENDGRID_API_KEY', default='')
+DEFAULT_FROM_EMAIL = config('EMAIL_FROM', default='noreply@example.com')
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

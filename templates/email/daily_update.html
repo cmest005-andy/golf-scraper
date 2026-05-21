@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+
+      <!-- Header -->
+      <tr>
+        <td style="background:#1a4a2e;padding:28px 32px;">
+          <div style="font-size:13px;color:#a8d5b5;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">{{ app_name }}</div>
+          <div style="font-size:26px;font-weight:700;color:#fff;">{{ tournament_name }}</div>
+          <div style="font-size:15px;color:#a8d5b5;margin-top:4px;">{{ round_label }} &nbsp;·&nbsp; {{ league_name }}</div>
+        </td>
+      </tr>
+
+      <!-- Commentary -->
+      <tr>
+        <td style="padding:28px 32px 16px;">
+          <div style="font-size:15px;line-height:1.7;color:#333;">
+            {% for para in commentary_paragraphs %}
+            <p style="margin:0 0 14px;">{{ para }}</p>
+            {% endfor %}
+          </div>
+        </td>
+      </tr>
+
+      <!-- Standings table -->
+      <tr>
+        <td style="padding:0 32px 28px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#1a4a2e;margin-bottom:10px;">League Standings</div>
+          <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+            <thead>
+              <tr style="border-bottom:2px solid #1a4a2e;">
+                <th style="padding:8px 6px;text-align:left;color:#555;font-weight:600;font-size:12px;">Pos</th>
+                <th style="padding:8px 6px;text-align:left;color:#555;font-weight:600;font-size:12px;">Team</th>
+                <th style="padding:8px 6px;text-align:right;color:#555;font-weight:600;font-size:12px;">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for team in standings %}
+              <tr style="border-bottom:1px solid #eee;{% if forloop.first %}background:#fffdf0;{% endif %}">
+                <td style="padding:10px 6px;font-weight:700;color:{% if forloop.first %}#c9a227{% else %}#aaa{% endif %};">
+                  {% if forloop.first %}1st{% elif forloop.counter == 2 %}2nd{% elif forloop.counter == 3 %}3rd{% else %}{{ forloop.counter }}th{% endif %}
+                </td>
+                <td style="padding:10px 6px;font-weight:{% if forloop.first %}700{% else %}400{% endif %};">
+                  {% if forloop.first %}🏆 {% endif %}{{ team.member_name }}
+                </td>
+                <td style="padding:10px 6px;text-align:right;font-weight:700;font-family:monospace;font-size:15px;">
+                  {% if team.team_score is not None %}
+                    {% if team.team_score < 0 %}<span style="color:#27ae60;">{{ team.team_score }}</span>
+                    {% elif team.team_score > 0 %}<span style="color:#e74c3c;">+{{ team.team_score }}</span>
+                    {% else %}<span style="color:#888;">E</span>{% endif %}
+                  {% else %}<span style="color:#aaa;">—</span>{% endif %}
+                </td>
+              </tr>
+              <!-- Player breakdown -->
+              {% for pick in team.picks %}
+              <tr style="background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                <td style="padding:3px 6px;"></td>
+                <td style="padding:3px 6px;font-size:12px;color:#666;padding-left:20px;">{{ pick.player_name }}</td>
+                <td style="padding:3px 6px;text-align:right;font-size:12px;font-family:monospace;">
+                  {% if pick.score_to_par is not None %}
+                    {% if pick.score_to_par < 0 %}<span style="color:#27ae60;">{{ pick.score_to_par }}</span>
+                    {% elif pick.score_to_par > 0 %}<span style="color:#e74c3c;">+{{ pick.score_to_par }}</span>
+                    {% else %}<span style="color:#888;">E</span>{% endif %}
+                  {% else %}<span style="color:#bbb;">—</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </td>
+      </tr>
+
+      {% if is_final %}
+      <!-- Winner banner -->
+      <tr>
+        <td style="padding:0 32px 28px;">
+          <div style="background:#1a4a2e;border-radius:6px;padding:20px 24px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:6px;">🏆</div>
+            <div style="font-size:20px;font-weight:700;color:#fff;">{{ winner_name }} wins the week!</div>
+            <div style="font-size:14px;color:#a8d5b5;margin-top:6px;">Congratulations — see you next tournament!</div>
+          </div>
+        </td>
+      </tr>
+      {% endif %}
+
+      <!-- Footer -->
+      <tr>
+        <td style="background:#f8f8f8;padding:16px 32px;border-top:1px solid #eee;text-align:center;">
+          <div style="font-size:12px;color:#aaa;">{{ app_name }} &nbsp;·&nbsp; Daily Update</div>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>

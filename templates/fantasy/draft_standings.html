@@ -59,12 +59,17 @@
                     </td>
                     {% for score in p.round_scores %}
                     <td class="text-center small">
-                        {% if score == 'MC' %}
-                        <span class="text-muted">MC</span>
-                        {% elif score is not None %}
-                        {{ score }}
+                        {% if score.type == 'score' %}
+                            {% if score.value < 0 %}<span class="score-under">{{ score.value }}</span>
+                            {% elif score.value > 0 %}<span class="score-over">+{{ score.value }}</span>
+                            {% else %}<span class="score-even">E</span>{% endif %}
+                            {% if score.thru and score.thru < 18 %}<span class="text-muted" style="font-size:.65rem;display:block;">thru {{ score.thru }}</span>{% endif %}
+                        {% elif score.type == 'tee_time' %}
+                            <span class="text-muted" style="font-size:.7rem;">{{ score.value|date:"g:i A" }}</span>
+                        {% elif score.type == 'mc' %}
+                            <span class="text-muted">MC</span>
                         {% else %}
-                        <span class="text-muted">—</span>
+                            <span class="text-muted">—</span>
                         {% endif %}
                     </td>
                     {% endfor %}

@@ -694,13 +694,18 @@ def draft_standings(request, pk):
         e.player_id: e
         for e in Leaderboard.objects.filter(tournament=draft.tournament)
     }
-    # round scores keyed by (player_id, round_number) → strokes
+    # round scores keyed by (player_id, round_number) → {score_to_par, thru, tee_time, status}
     round_map = {}
     for ps in PlayerScore.objects.filter(
         tournament=draft.tournament,
         round__round_number__lte=4,
     ).select_related('round'):
-        round_map[(ps.player_id, ps.round.round_number)] = ps.strokes
+        round_map[(ps.player_id, ps.round.round_number)] = {
+            'score_to_par': ps.score_to_par,
+            'thru':         ps.thru,
+            'tee_time':     ps.tee_time,
+            'status':       ps.status,
+        }
 
     # Determine how many rounds the tournament has
     max_rounds = max((rn for _, rn in round_map), default=4) if round_map else 4
@@ -731,13 +736,22 @@ def draft_standings(request, pk):
 
             round_scores = []
             for rn in round_numbers:
-                strokes = round_map.get((pick.player_id, rn))
-                if strokes is not None:
-                    round_scores.append(strokes)
+                ps_data = round_map.get((pick.player_id, rn))
+                if ps_data is not None:
+                    stp   = ps_data['score_to_par']
+                    thru  = ps_data['thru']
+                    ttime = ps_data['tee_time']
+                    st    = ps_data['status']
+                    if stp is not None:
+                        round_scores.append({'type': 'score', 'value': stp, 'thru': thru})
+                    elif ttime and st == 'scheduled':
+                        round_scores.append({'type': 'tee_time', 'value': ttime})
+                    else:
+                        round_scores.append({'type': 'pending'})
                 elif missed_cut and rn > rounds_completed:
-                    round_scores.append('MC')
+                    round_scores.append({'type': 'mc'})
                 else:
-                    round_scores.append(None)
+                    round_scores.append({'type': 'pending'})
 
             score_to_par = entry.total_score_to_par if entry and entry.total_score_to_par is not None else None
             if score_to_par is not None:

@@ -615,8 +615,8 @@ if (pauseBtn) {
                 if (picksChanged && data.picks) {
                     updateTeamsFromPicks(data.picks);
                     hidePickedPlayers(data.picks);
+                    updateClockName(data.on_the_clock);
                     if (!turnChanged && !iLostMyTurn) {
-                        updateClockName(data.on_the_clock);
                         updateClockBanner(data);
                     }
                     lastPicks = data.total_picks;

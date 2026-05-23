@@ -61,7 +61,7 @@
                     <th>Player</th>
                     <th class="d-none d-md-table-cell">Country</th>
                     {% if tournament.status == 'in_progress' %}
-                    <th class="text-center d-none d-md-table-cell">Thru</th>
+                    <th class="text-center">Thru</th>
                     {% endif %}
                     {% for rn in round_numbers %}
                     <th class="text-center {% if not forloop.last %}d-none d-md-table-cell{% endif %}">R{{ rn }}</th>
@@ -84,7 +84,7 @@
                     <td class="d-none d-md-table-cell text-muted small">{{ entry.player.country|default:"—" }}</td>
 
                     {% if tournament.status == 'in_progress' %}
-                    <td class="text-center text-muted d-none d-md-table-cell small" data-field="thru">
+                    <td class="text-center text-muted small" data-field="thru">
                         {% if thru is None %}—{% elif thru == 18 %}F{% else %}{{ thru }}{% endif %}
                     </td>
                     {% endif %}

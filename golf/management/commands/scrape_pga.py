@@ -172,6 +172,7 @@ class Command(BaseCommand):
         round_map = {r.round_number: r for r in TournamentRound.objects.filter(tournament=tournament)}
 
         # Bulk upsert leaderboard
+        now = datetime.now(timezone.utc)
         lb_rows = []
         for c in competitors:
             espn_id = str(c.get('id', ''))
@@ -186,12 +187,13 @@ class Command(BaseCommand):
                 position=str(c.get('order', '')),
                 total_score_to_par=_parse_score(total_display),
                 rounds_completed=len(c.get('linescores', [])),
+                last_updated=now,
             ))
         Leaderboard.objects.bulk_create(
             lb_rows,
             update_conflicts=True,
             unique_fields=['tournament', 'player'],
-            update_fields=['position', 'total_score_to_par', 'rounds_completed'],
+            update_fields=['position', 'total_score_to_par', 'rounds_completed', 'last_updated'],
         )
 
         # Bulk upsert player scores

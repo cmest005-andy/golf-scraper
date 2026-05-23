@@ -126,9 +126,10 @@
             </thead>
             <tbody>
                 {% for entry, round_scores, missed_cut in recent_results %}
-                <tr>
+                <tr class="result-row" style="cursor:pointer;" data-detail="detail-{{ forloop.counter }}">
                     <td>
-                        <a href="{% url 'golf:index' %}?tournament={{ entry.tournament.pk }}" class="player-link">
+                        <span class="chevron text-muted me-1" style="font-size:.65rem;display:inline-block;transition:transform .2s;">▶</span>
+                        <a href="{% url 'golf:index' %}?tournament={{ entry.tournament.pk }}" class="player-link" onclick="event.stopPropagation()">
                             {{ entry.tournament.name }}
                         </a>
                     </td>
@@ -159,11 +160,49 @@
                         {% endif %}
                     </td>
                 </tr>
+                <tr id="detail-{{ forloop.counter }}" style="display:none;background:#f8f9fa;">
+                    <td colspan="{{ round_columns|length|add:3 }}" class="py-2 px-3">
+                        <div class="d-flex gap-4 justify-content-center flex-wrap">
+                            {% for score in round_scores %}
+                            <div class="text-center">
+                                <div class="text-muted" style="font-size:.7rem;font-weight:600;letter-spacing:.05em;">R{{ forloop.counter }}</div>
+                                <div class="small fw-semibold">
+                                    {% if score and score.strokes is not None %}
+                                        {% if score.score_to_par is not None and score.score_to_par < 0 %}<span class="score-under">{{ score.strokes }}</span>
+                                        {% elif score.score_to_par is not None and score.score_to_par > 0 %}<span class="score-over">{{ score.strokes }}</span>
+                                        {% elif score.score_to_par == 0 %}<span class="score-even">{{ score.strokes }}</span>
+                                        {% else %}{{ score.strokes }}
+                                        {% endif %}
+                                    {% elif missed_cut and forloop.counter0 >= 2 %}
+                                        <span class="text-muted">MC</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
 {% endif %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.result-row').forEach(row => {
+    row.addEventListener('click', () => {
+        const detail  = document.getElementById(row.dataset.detail);
+        const chevron = row.querySelector('.chevron');
+        const open    = detail.style.display !== 'none';
+        detail.style.display  = open ? 'none' : 'table-row';
+        chevron.style.transform = open ? '' : 'rotate(90deg)';
+    });
+});
+</script>
+{% endblock %}
 
 {% endblock %}

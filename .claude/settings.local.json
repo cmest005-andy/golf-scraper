@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node dev.js /Users/cmestre/Projects/golf_scraper \"what stack am i working with\")"
+    ]
+  }
+}

@@ -102,6 +102,8 @@ EMAIL_HOST_USER    = 'apikey'
 EMAIL_HOST_PASSWORD = config('SENDGRID_API_KEY', default='')
 DEFAULT_FROM_EMAIL = config('EMAIL_FROM', default='noreply@example.com')
 
+ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

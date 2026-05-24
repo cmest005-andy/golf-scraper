@@ -14,7 +14,7 @@ Usage
     python manage.py send_daily_update --dry-run   (prints without sending)
 """
 
-import random
+import anthropic
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -27,45 +27,8 @@ from golf.models import Leaderboard, Tournament, TournamentRound
 
 
 # ------------------------------------------------------------------ #
-# Sports-talk commentary builders
+# Helpers
 # ------------------------------------------------------------------ #
-
-_LEADER_LINES = [
-    "{name} is running the show this week at {score}, and right now their draft sheet looks like a masterpiece.",
-    "Sitting pretty at {score}, {name} is the one everyone else is chasing — and they know it.",
-    "{name} has the hot hand at {score}. Bold picks, big results. That's how you do it.",
-    "At {score}, {name} is in the driver's seat. Someone's going to have to make a move to knock them off.",
-]
-
-_CHASE_LINES = [
-    "{name} is breathing down their neck at {score} — just {gap} stroke{s} back and very much alive.",
-    "Don't sleep on {name}. They're sitting at {score}, only {gap} stroke{s} off the pace.",
-    "{name} is lurking at {score}, {gap} stroke{s} back. This thing is far from over.",
-]
-
-_MID_LINES = [
-    "{name} is grinding through the week at {score} — still in the mix, still dangerous.",
-    "Sitting at {score}, {name} is waiting for their players to catch fire. It could happen.",
-]
-
-_LAST_LINES = [
-    "{name} is having a tough go at {score} — sometimes the picks just don't fall your way.",
-    "It's been a rough week for {name} at {score}. Nothing a little luck on the back nine can't fix.",
-    "{name} is sitting at {score} and probably checking injury reports as we speak.",
-]
-
-_CLOSING_LINES = [
-    "The tournament isn't over yet — anything can happen out there. Check back tomorrow for the latest.",
-    "Still plenty of golf left to be played. Tomorrow's update could look completely different.",
-    "Golf has a way of turning things upside down overnight. Stay tuned.",
-]
-
-_FINAL_CLOSING = [
-    "What a week it's been. Hats off to everyone who played — see you at the next one.",
-    "Another tournament in the books. The best team won and there's no arguing with the scoreboard.",
-    "That's a wrap. Start scouting your picks for next week — the competition isn't letting up.",
-]
-
 
 def _score_str(score):
     if score is None:
@@ -78,52 +41,54 @@ def _score_str(score):
 
 
 def _build_commentary(standings, tournament_name, round_label, is_final):
-    """Return a list of paragraph strings in sports-talk style."""
-    paras = []
-
+    """Call Claude to generate fun sports-talk commentary. Returns a list of paragraphs."""
     if not standings or all(t['team_score'] is None for t in standings):
-        paras.append(f"Scores are still rolling in from {tournament_name}. Check back soon for the full picture.")
-        return paras
+        return [f"Scores are still rolling in from {tournament_name}. Check back soon for the full picture."]
 
-    scored = [t for t in standings if t['team_score'] is not None]
-    if not scored:
-        return paras
+    # Build a plain-text standings summary to feed Claude
+    lines = []
+    for i, team in enumerate(standings, 1):
+        score = _score_str(team['team_score'])
+        picks = ', '.join(
+            f"{p['player_name']} ({_score_str(p['score_to_par'])})"
+            for p in team['picks']
+        )
+        lines.append(f"{i}. {team['member_name']} — {score}  [{picks}]")
+    standings_text = '\n'.join(lines)
 
-    leader = scored[0]
-    paras.append(random.choice(_LEADER_LINES).format(
-        name=leader['member_name'],
-        score=_score_str(leader['team_score']),
-    ))
+    day_context = (
+        "This is the final day — the tournament is over."
+        if is_final else
+        f"This is the {round_label} update — the tournament is still in progress."
+    )
 
-    if len(scored) >= 2:
-        second = scored[1]
-        gap = second['team_score'] - leader['team_score']
-        paras.append(random.choice(_CHASE_LINES).format(
-            name=second['member_name'],
-            score=_score_str(second['team_score']),
-            gap=gap,
-            s='s' if gap != 1 else '',
-        ))
+    prompt = (
+        f"You are a witty, enthusiastic fantasy golf league announcer. "
+        f"Write a short, fun sports-talk commentary recap (3–5 sentences, 2 short paragraphs max) "
+        f"for the {tournament_name} fantasy league update. {day_context}\n\n"
+        f"Current standings:\n{standings_text}\n\n"
+        f"Be specific — mention team names and scores. Be playful, use golf metaphors, "
+        f"keep it light and fun. Do not use bullet points or headers, just natural prose paragraphs."
+    )
 
-    for team in scored[2:max(2, len(scored) - 1)]:
-        paras.append(random.choice(_MID_LINES).format(
-            name=team['member_name'],
-            score=_score_str(team['team_score']),
-        ))
-
-    if len(scored) > 2:
-        last = scored[-1]
-        paras.append(random.choice(_LAST_LINES).format(
-            name=last['member_name'],
-            score=_score_str(last['team_score']),
-        ))
-
-    if is_final:
-        paras.append(random.choice(_FINAL_CLOSING))
-    else:
-        paras.append(random.choice(_CLOSING_LINES))
-
-    return paras
+    try:
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=400,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+        text = message.content[0].text.strip()
+        # Split on blank lines to get paragraph list
+        paras = [p.strip() for p in text.split('\n\n') if p.strip()]
+        return paras if paras else [text]
+    except Exception as e:
+        # Fall back to a simple summary if the API call fails
+        leader = standings[0]
+        return [
+            f"{leader['member_name']} leads {tournament_name} at {_score_str(leader['team_score'])}. "
+            f"Full standings below."
+        ]
 
 
 # ------------------------------------------------------------------ #

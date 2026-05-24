@@ -1,5 +1,7 @@
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 
 from .forms import RegisterForm
@@ -34,7 +36,13 @@ def account_settings(request):
             error = 'Display name must be 100 characters or fewer.'
         elif len(phone) > 20:
             error = 'Phone number must be 20 characters or fewer.'
-        else:
+        elif email:
+            try:
+                validate_email(email)
+            except ValidationError:
+                error = 'Enter a valid email address.'
+
+        if not error:
             profile.display_name = display_name
             profile.phone        = phone
             profile.save()

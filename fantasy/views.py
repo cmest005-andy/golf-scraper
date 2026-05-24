@@ -267,12 +267,15 @@ def create_draft(request, league_pk):
             )
             owgr_url = request.POST.get('owgr_url', '').strip()
             if owgr_url:
-                try:
-                    from golf.rankings import fetch_rankings_from_url
-                    import requests as _req
-                    fetch_rankings_from_url(owgr_url)
-                except _req.RequestException:
-                    pass  # non-fatal — draft still created
+                from urllib.parse import urlparse
+                parsed = urlparse(owgr_url)
+                if parsed.scheme == 'https' and parsed.netloc.endswith('owgr.com'):
+                    try:
+                        from golf.rankings import fetch_rankings_from_url
+                        import requests as _req
+                        fetch_rankings_from_url(owgr_url)
+                    except _req.RequestException:
+                        pass  # non-fatal — draft still created
             return redirect('fantasy:league_detail', pk=league_pk)
 
     return render(request, 'fantasy/create_draft.html', {

@@ -770,14 +770,23 @@ if (pauseBtn) {
         });
     }
 
-    function getCtx() {
-        if (!window._audioCtx) window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        return window._audioCtx;
+    // Create the context immediately and unlock it on first interaction
+    const _AudioContext = window.AudioContext || window.webkitAudioContext;
+    window._audioCtx = new _AudioContext();
+
+    function unlockAudio() {
+        if (window._audioCtx.state === 'suspended') window._audioCtx.resume();
     }
+    ['click', 'touchstart', 'keydown'].forEach(evt =>
+        document.addEventListener(evt, unlockAudio, { once: false, passive: true })
+    );
+
+    function getCtx() { return window._audioCtx; }
 
     function playTick() {
         if (muted) return;
         const ctx = getCtx();
+        ctx.resume();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
@@ -793,6 +802,7 @@ if (pauseBtn) {
     function playDing() {
         if (muted) return;
         const ctx = getCtx();
+        ctx.resume();
         // Two-tone golf bell: fundamental + harmonic
         [[1047, 0.5, 0.45], [1568, 0.25, 0.35]].forEach(([freq, vol, decay]) => {
             const osc  = ctx.createOscillator();

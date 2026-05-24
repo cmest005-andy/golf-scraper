@@ -417,6 +417,8 @@ if (availSearch) {
     const headerEl    = document.getElementById('draft-countdown');
     const lobbyEl     = document.getElementById('draft-start-countdown');
     const draftStarted = {{ draft_started|yesno:'true,false' }};
+    let countdownSoundFired = false;
+
     function fmt(diff) {
         const d = Math.floor(diff / 86400000);
         const h = Math.floor((diff % 86400000) / 3600000);
@@ -424,16 +426,71 @@ if (availSearch) {
         const s = Math.floor((diff % 60000) / 1000);
         return d > 0 ? `${d}d ${h}h ${m}m` : h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
     }
+
+    function playCountdownTick(secondsLeft) {
+        if (typeof window._audioCtx === 'undefined') return;
+        const ctx = window._audioCtx;
+        ctx.resume();
+        // Pitch and volume rise as countdown approaches zero
+        const progress = (10 - secondsLeft) / 10;
+        const freq   = 300 + progress * 250;   // 300Hz → 550Hz
+        const vol    = 0.15 + progress * 0.35; // gets louder
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.12);
+    }
+
+    function playDraftStartFanfare() {
+        if (typeof window._audioCtx === 'undefined') return;
+        const ctx = window._audioCtx;
+        ctx.resume();
+        // Triumphant three-note rising chord
+        const notes = [
+            { freq: 523, start: 0,    dur: 0.6, vol: 0.5  },  // C5
+            { freq: 659, start: 0.12, dur: 0.6, vol: 0.45 },  // E5
+            { freq: 784, start: 0.24, dur: 0.9, vol: 0.55 },  // G5
+            { freq: 1047,start: 0.36, dur: 1.1, vol: 0.4  },  // C6
+        ];
+        notes.forEach(({ freq, start, dur, vol }) => {
+            const osc  = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+            gain.gain.setValueAtTime(vol, ctx.currentTime + start);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+            osc.start(ctx.currentTime + start);
+            osc.stop(ctx.currentTime + start + dur);
+        });
+    }
+
     function tick() {
         const diff = target - Date.now();
         if (diff <= 0) {
-            if (!draftStarted) { location.reload(); return; }
+            if (!draftStarted) {
+                if (!countdownSoundFired) { countdownSoundFired = true; playDraftStartFanfare(); }
+                setTimeout(() => location.reload(), 1200);
+                return;
+            }
             if (headerEl) headerEl.textContent = 'Started';
             return;
         }
+        const secsLeft = Math.ceil(diff / 1000);
         const text = fmt(diff);
         if (headerEl) headerEl.textContent = text;
         if (lobbyEl)  lobbyEl.textContent  = text;
+
+        // Play escalating tick for the last 10 seconds
+        if (secsLeft <= 10) playCountdownTick(secsLeft);
+
         setTimeout(tick, 1000);
     }
     tick();

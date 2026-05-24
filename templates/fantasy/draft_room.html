@@ -36,6 +36,7 @@
             <button type="submit" class="btn btn-sm btn-outline-secondary">Lock Draft</button>
         </form>
         {% endif %}
+        <button id="sound-toggle" class="btn btn-sm btn-outline-secondary" title="Toggle draft sounds">🔊</button>
     </div>
 </div>
 
@@ -613,6 +614,7 @@ if (pauseBtn) {
 
                 // Any pick: update team list + hide picked player from both panels
                 if (picksChanged && data.picks) {
+                    if (typeof window.playPickAlert === 'function') window.playPickAlert();
                     updateTeamsFromPicks(data.picks);
                     hidePickedPlayers(data.picks);
                     updateClockName(data.on_the_clock);
@@ -747,6 +749,84 @@ if (pauseBtn) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatForm.requestSubmit(); }
         });
     }
+})();
+
+// ── Draft sounds ──────────────────────────────────────────────────────────────
+(function () {
+    const btn = document.getElementById('sound-toggle');
+    let muted = localStorage.getItem('draftSoundMuted') === 'true';
+    let countdownHandle = null;
+
+    function applyMuteUI() {
+        if (btn) btn.textContent = muted ? '🔇' : '🔊';
+    }
+    applyMuteUI();
+
+    if (btn) {
+        btn.addEventListener('click', () => {
+            muted = !muted;
+            localStorage.setItem('draftSoundMuted', muted);
+            applyMuteUI();
+        });
+    }
+
+    function getCtx() {
+        if (!window._audioCtx) window._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return window._audioCtx;
+    }
+
+    function playTick() {
+        if (muted) return;
+        const ctx = getCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.08);
+    }
+
+    function playDing() {
+        if (muted) return;
+        const ctx = getCtx();
+        // Two-tone golf bell: fundamental + harmonic
+        [[1047, 0.5, 0.45], [1568, 0.25, 0.35]].forEach(([freq, vol, decay]) => {
+            const osc  = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + decay);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + decay);
+        });
+    }
+
+    function playPickAlert() {
+        if (muted) return;
+        if (countdownHandle) clearInterval(countdownHandle);
+        let ticks = 0;
+        playTick();
+        countdownHandle = setInterval(() => {
+            ticks++;
+            if (ticks < 5) {
+                playTick();
+            } else {
+                clearInterval(countdownHandle);
+                countdownHandle = null;
+                playDing();
+            }
+        }, 1000);
+    }
+
+    // Expose so the poll loop can call it
+    window.playPickAlert = playPickAlert;
 })();
 </script>
 {% endblock %}

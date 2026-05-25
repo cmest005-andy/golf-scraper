@@ -166,7 +166,7 @@ class Command(BaseCommand):
             WeeklyDraft.objects
             .filter(
                 status__in=[WeeklyDraft.Status.OPEN, WeeklyDraft.Status.LOCKED],
-                tournament__status=Tournament.Status.IN_PROGRESS,
+                tournament__status__in=[Tournament.Status.IN_PROGRESS, Tournament.Status.COMPLETED],
             )
             .select_related('league', 'tournament', 'league__commissioner')
         )

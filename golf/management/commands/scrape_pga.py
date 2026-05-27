@@ -68,6 +68,21 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f'  Skipped ({e})'))
             return
 
+        # Auto-complete tournaments that are still in_progress but whose end date
+        # has passed. Covers the Railway Sunday cron gap where the final-round
+        # scrape never fires and the tournament stays stuck as in_progress.
+        today = datetime.now(timezone.utc).date()
+        stale = Tournament.objects.filter(
+            status=Tournament.Status.IN_PROGRESS,
+            end_date__lt=today,
+        )
+        for t in stale:
+            t.status = Tournament.Status.COMPLETED
+            t.save(update_fields=['status'])
+            self.stdout.write(self.style.WARNING(
+                f'  [Auto-completed] {t.name} (end_date {t.end_date} has passed)'
+            ))
+
         self.stdout.write('\nFetching current scoreboard...')
         data = fetch_scoreboard()
         events = data.get('events', [])

@@ -147,7 +147,7 @@
                              data-meta="{% if has_odds %}{{ odds_map|get_odds:entry.player_id }}{% elif entry.player.world_ranking %}#{{ entry.player.world_ranking }}{% endif %}">
                             <span class="small">{{ entry.player.display_name }}
                                 <span class="text-muted" style="font-size:.75rem;">
-                                    {% if has_round_scores and entry.total_score_to_par is not None %}
+                                    {% if has_round_scores and entry.total_score_to_par is not None and draft.tournament.status != 'scheduled' %}
                                         {% if entry.total_score_to_par < 0 %}{{ entry.total_score_to_par }}{% elif entry.total_score_to_par > 0 %}+{{ entry.total_score_to_par }}{% else %}E{% endif %}
                                     {% endif %}
                                 </span>

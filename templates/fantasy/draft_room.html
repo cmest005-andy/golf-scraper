@@ -369,7 +369,21 @@ if (confirmBtn) {
         })
         .then(r => r.json())
         .then(data => {
-            if (data.ok) { location.reload(); }
+            if (data.ok) {
+                // Hide the picked player immediately without a full reload
+                // so the available list stays live for the rest of the draft
+                document.querySelectorAll('.pick-row, .avail-row').forEach(row => {
+                    if (String(row.dataset.playerId) === String(pendingPlayerId)) {
+                        row.style.display = 'none';
+                        row.dataset.picked = '1';
+                    }
+                });
+                clearPreview();
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Confirm Pick';
+                showWaitingPanel();
+                // Poll will detect the pick within 2.5s and update teams/clock banner
+            }
             else {
                 alert(data.error || 'Pick failed.');
                 confirmBtn.disabled = false;

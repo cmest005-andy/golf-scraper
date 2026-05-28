@@ -77,7 +77,7 @@
                         {{ entry.position|default:"—" }}
                     </td>
                     {% endif %}
-                    <td>
+                    <td style="white-space:nowrap;">
                         <a href="{% url 'golf:player_detail' entry.player.espn_id %}" class="player-link">
                             {{ entry.player.display_name }}
                         </a>

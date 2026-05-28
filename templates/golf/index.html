@@ -63,7 +63,7 @@
                     <th class="text-center">Thru</th>
                     {% endif %}
                     {% for rn in round_numbers %}
-                    <th class="text-center round-cell {% if not forloop.last %}d-none d-md-table-cell{% endif %}">R{{ rn }}</th>
+                    <th class="text-center round-cell">R{{ rn }}</th>
                     {% endfor %}
                     {% if tournament.status != 'scheduled' %}<th class="text-center">Total</th>{% endif %}
                 </tr>
@@ -91,7 +91,7 @@
                     {% endif %}
 
                     {% for rn, score in round_scores %}
-                    <td class="text-center small round-cell {% if not forloop.last %}d-none d-md-table-cell{% endif %}"
+                    <td class="text-center small round-cell"
                         data-field="round-{{ rn }}">
                         {% if score %}
                             {% if score.strokes is None and score.tee_time %}

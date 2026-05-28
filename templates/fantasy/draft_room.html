@@ -405,7 +405,7 @@ if (pickSearch) {
         const term = pickSearch.value.toLowerCase();
         document.querySelectorAll('.pick-row').forEach(row => {
             if (row.dataset.picked) return;
-            const name = row.dataset.name || '';
+            const name = (row.dataset.displayName || '').toLowerCase();
             row.style.display = (!term || name.startsWith(term) || name.includes(' ' + term)) ? '' : 'none';
         });
     });
@@ -418,7 +418,7 @@ if (availSearch) {
         const term = availSearch.value.toLowerCase();
         document.querySelectorAll('.avail-row').forEach(row => {
             if (row.dataset.picked) return;
-            const name = row.dataset.name || '';
+            const name = (row.dataset.displayName || '').toLowerCase();
             row.style.display = (!term || name.startsWith(term) || name.includes(' ' + term)) ? '' : 'none';
         });
     });

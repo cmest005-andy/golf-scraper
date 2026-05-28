@@ -29,40 +29,64 @@ def index(request):
         .aggregate(max_season=Max('season'))['max_season']
     )
 
+    # Include scheduled tournaments only if they have scraped data (tee times / field)
+    scheduled_with_data = set(
+        Leaderboard.objects
+        .filter(tournament__season=current_season, tournament__status=Tournament.Status.SCHEDULED)
+        .values_list('tournament_id', flat=True)
+        .distinct()
+    )
+
     tournaments = (
         Tournament.objects
         .filter(season=current_season)
         .exclude(status=Tournament.Status.SCHEDULED)
-        .annotate(
-            status_order=Case(
-                When(status=Tournament.Status.IN_PROGRESS, then=Value(0)),
-                default=Value(1),
-                output_field=IntegerField(),
-            )
+        .union(
+            Tournament.objects.filter(pk__in=scheduled_with_data)
         )
-        .order_by('status_order', '-start_date')
     )
 
+    tournament_ids = list(tournaments.values_list('pk', flat=True))
+    tournaments_qs = Tournament.objects.filter(pk__in=tournament_ids)
+
+    # Default: in-progress → soonest upcoming with data → most recently completed
     tournament_id = request.GET.get('tournament')
     if tournament_id:
         tournament = get_object_or_404(Tournament, pk=tournament_id)
     else:
         tournament = (
-            tournaments.filter(status=Tournament.Status.IN_PROGRESS).first()
-            or tournaments.first()
+            tournaments_qs.filter(status=Tournament.Status.IN_PROGRESS).order_by('start_date').first()
+            or Tournament.objects.filter(pk__in=scheduled_with_data).order_by('start_date').first()
+            or tournaments_qs.filter(status=Tournament.Status.COMPLETED).order_by('-start_date').first()
+            or tournaments_qs.first()
         )
+
+    # Sort for dropdown: in-progress, then soonest upcoming, then most recently completed
+    import datetime as _dt
+    _epoch = _dt.date(2000, 1, 1)
+    def _sort_key(t):
+        days = (t.start_date - _epoch).days
+        if t.status == Tournament.Status.IN_PROGRESS:
+            return (0, days)
+        if t.status == Tournament.Status.SCHEDULED:
+            return (1, days)
+        return (2, -days)
+
+    tournaments = sorted(tournaments_qs, key=_sort_key)
 
     search = request.GET.get('search', '').strip()
     leaderboard_data = []
     round_numbers = []
 
     if tournament:
-        round_numbers = list(
+        existing_rounds = list(
             TournamentRound.objects
             .filter(tournament=tournament)
             .order_by('round_number')
             .values_list('round_number', flat=True)
         )
+        max_round = max(max(existing_rounds, default=0), 4)
+        round_numbers = list(range(1, max_round + 1))
 
         score_map = {
             (s.player_id, s.round.round_number): s
@@ -71,13 +95,21 @@ def index(request):
                 .select_related('round')
         }
 
+        from django.db.models.functions import Coalesce
+        from django.db.models import IntegerField as IF
         leaderboard = (
             Leaderboard.objects
             .filter(tournament=tournament)
             .select_related('player')
-            .annotate(pos_int=RawSQL("CAST(NULLIF(position, '') AS INTEGER)", []))
-            .order_by('total_score_to_par', 'pos_int')
+            .annotate(
+                pos_int=RawSQL("CAST(NULLIF(position, '') AS INTEGER)", []),
+                wr=Coalesce('player__world_ranking', Value(9999, output_field=IF())),
+            )
         )
+        if tournament.status == Tournament.Status.SCHEDULED:
+            leaderboard = leaderboard.order_by('wr')
+        else:
+            leaderboard = leaderboard.order_by('total_score_to_par', 'pos_int')
 
         if search:
             leaderboard = leaderboard.filter(

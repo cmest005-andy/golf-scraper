@@ -20,8 +20,13 @@
                     </div>
                     <div class="mb-4">
                         <label class="form-label small fw-semibold">Seconds Per Pick</label>
+                        {% if picks_started %}
+                        <input type="number" value="{{ draft.pick_time_limit }}" class="form-control form-control-sm" disabled>
+                        <div class="form-text text-warning">Locked — cannot be changed after picks begin.</div>
+                        {% else %}
                         <input type="number" name="pick_time_limit" value="{{ draft.pick_time_limit }}" min="30" max="600" class="form-control form-control-sm">
                         <div class="form-text">Default 120 (2 min). Minimum 30 seconds.</div>
+                        {% endif %}
                     </div>
                     <button type="submit" class="btn btn-sm w-100" style="background:var(--green-dark);color:#fff;">Save</button>
                 </form>

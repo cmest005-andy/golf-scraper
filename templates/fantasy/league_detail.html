@@ -172,6 +172,8 @@
                                                     {% if pick.score_to_par < 0 %}<span style="color:#27ae60;">{{ pick.score_to_par }}</span>
                                                     {% elif pick.score_to_par > 0 %}<span style="color:#e74c3c;">+{{ pick.score_to_par }}</span>
                                                     {% else %}<span class="text-muted">E</span>{% endif %}
+                                                {% elif pick.tee_time %}
+                                                    <span class="text-muted">{{ pick.tee_time|date:"g:i A" }}</span>
                                                 {% else %}<span class="text-muted">—</span>{% endif %}
                                             </td>
                                         </tr>

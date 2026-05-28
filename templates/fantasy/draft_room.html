@@ -11,9 +11,6 @@
             {{ draft.tournament.name }} Draft
         </h1>
         <span class="text-muted small">{{ draft.tournament.start_date|date:"M j" }}–{{ draft.tournament.end_date|date:"M j, Y" }}</span>
-        {% if draft.draft_time and not draft_started %}
-        <span class="text-muted small">⏰ <strong style="color:var(--gold);" id="draft-countdown"></strong> &nbsp;·&nbsp; {{ draft.draft_time|date:"N j, Y g:i A" }}</span>
-        {% endif %}
     </div>
     <div class="d-flex align-items-center gap-2">
         <span class="badge-status badge-{% if draft.status == 'open' %}in_progress{% elif draft.status == 'locked' %}completed{% else %}scheduled{% endif %}">
@@ -21,9 +18,6 @@
         </span>
         {% if draft.status == 'open' and not draft_complete %}
         <span id="live-dot" title="Live" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e74c3c;animation:livepulse 1.4s ease-in-out infinite;"></span>
-        {% endif %}
-        {% if is_commissioner %}
-        <a href="{% url 'fantasy:set_draft_time' draft.pk %}" class="btn btn-sm btn-outline-secondary">{% if draft.draft_time %}Edit Time{% else %}Set Time{% endif %}</a>
         {% endif %}
         {% if is_commissioner and draft.status == 'open' and not draft_complete %}
         <button id="pause-btn" class="btn btn-sm btn-outline-secondary">
@@ -138,7 +132,7 @@
                         <span class="text-muted fw-normal" style="font-size:.7rem;">{% if has_odds %}Odds{% else %}World Ranking{% endif %}</span>
                     </h6>
                     <input type="search" id="pick-search" placeholder="Search player…" class="form-control form-control-sm mb-2" autocomplete="off">
-                    <div id="pick-list" style="max-height:360px;overflow-y:auto;">
+                    <div id="pick-list" style="max-height:300px;overflow-y:auto;">
                         {% for entry in available %}
                         <div class="pick-row d-flex align-items-center justify-content-between py-1 border-bottom"
                              data-name="{{ entry.player.display_name|lower }}"
@@ -177,7 +171,7 @@
                         <span class="text-muted fw-normal" style="font-size:.7rem;">{% if has_odds %}Odds{% else %}World Ranking{% endif %}</span>
                     </h6>
                     <input type="search" id="avail-search" placeholder="Search player…" class="form-control form-control-sm mb-2" autocomplete="off">
-                    <div style="max-height:400px;overflow-y:auto;">
+                    <div style="max-height:300px;overflow-y:auto;">
                         {% for entry in available %}
                         <div class="avail-row d-flex align-items-center justify-content-between py-1 border-bottom"
                              data-player-id="{{ entry.player.pk }}"
@@ -223,6 +217,7 @@
     0%, 100% { opacity: 1; }
     50%       { opacity: .25; }
 }
+.is-hidden { display: none !important; }
 .team-btn {
     display: block;
     width: 100%;
@@ -367,14 +362,17 @@ if (confirmBtn) {
             headers: {'X-CSRFToken': PICK_CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
             body: body,
         })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) {
+                return r.text().then(t => { throw new Error('HTTP ' + r.status + ': ' + t.slice(0, 200)); });
+            }
+            return r.json();
+        })
         .then(data => {
             if (data.ok) {
-                // Hide the picked player immediately without a full reload
-                // so the available list stays live for the rest of the draft
                 document.querySelectorAll('.pick-row, .avail-row').forEach(row => {
                     if (String(row.dataset.playerId) === String(pendingPlayerId)) {
-                        row.style.display = 'none';
+                        row.classList.add('is-hidden');
                         row.dataset.picked = '1';
                     }
                 });
@@ -382,7 +380,7 @@ if (confirmBtn) {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = 'Confirm Pick';
                 showWaitingPanel();
-                // Poll will detect the pick within 2.5s and update teams/clock banner
+                if (typeof window.draftPoll === 'function') window.draftPoll();
             }
             else {
                 alert(data.error || 'Pick failed.');
@@ -390,8 +388,9 @@ if (confirmBtn) {
                 confirmBtn.textContent = 'Confirm Pick';
             }
         })
-        .catch(() => {
-            alert('Network error.');
+        .catch(err => {
+            console.error('Pick error:', err);
+            alert('Pick error: ' + (err.message || err));
             confirmBtn.disabled = false;
             confirmBtn.textContent = 'Confirm Pick';
         });
@@ -406,7 +405,8 @@ if (pickSearch) {
         document.querySelectorAll('.pick-row').forEach(row => {
             if (row.dataset.picked) return;
             const name = (row.dataset.displayName || '').toLowerCase();
-            row.style.display = (!term || name.startsWith(term) || name.includes(' ' + term)) ? '' : 'none';
+            const show = !term || name.startsWith(term) || name.includes(' ' + term);
+            row.classList.toggle('is-hidden', !show);
         });
     });
 }
@@ -418,8 +418,9 @@ if (availSearch) {
         const term = availSearch.value.toLowerCase();
         document.querySelectorAll('.avail-row').forEach(row => {
             if (row.dataset.picked) return;
-            const name = (row.dataset.displayName || '').toLowerCase();
-            row.style.display = (!term || name.startsWith(term) || name.includes(' ' + term)) ? '' : 'none';
+            const name = (row.dataset.name || '').toLowerCase();
+            const show = !term || name.startsWith(term) || name.includes(' ' + term);
+            row.classList.toggle('is-hidden', !show);
         });
     });
 }
@@ -428,7 +429,6 @@ if (availSearch) {
 {% if draft.draft_time %}
 (function() {
     const target      = new Date("{{ draft.draft_time|date:'c' }}");
-    const headerEl    = document.getElementById('draft-countdown');
     const lobbyEl     = document.getElementById('draft-start-countdown');
     const draftStarted = {{ draft_started|yesno:'true,false' }};
     let countdownSoundFired = false;
@@ -494,13 +494,11 @@ if (availSearch) {
                 setTimeout(() => location.reload(), 1200);
                 return;
             }
-            if (headerEl) headerEl.textContent = 'Started';
-            return;
+                return;
         }
         const secsLeft = Math.ceil(diff / 1000);
         const text = fmt(diff);
-        if (headerEl) headerEl.textContent = text;
-        if (lobbyEl)  lobbyEl.textContent  = text;
+        if (lobbyEl) lobbyEl.textContent = text;
 
         // Play escalating tick for the last 10 seconds
         if (secsLeft <= 10) playCountdownTick(secsLeft);
@@ -524,6 +522,20 @@ if (pauseBtn) {
             pauseBtn.textContent = data.paused ? '▶ Resume' : '⏸ Pause';
         });
     });
+}
+
+function showMyTurnPanel() {
+    const mine    = document.getElementById('pick-panel-mine');
+    const waiting = document.getElementById('pick-panel-waiting');
+    if (mine)    mine.style.display    = 'block';
+    if (waiting) waiting.style.display = 'none';
+}
+
+function showWaitingPanel() {
+    const mine    = document.getElementById('pick-panel-mine');
+    const waiting = document.getElementById('pick-panel-waiting');
+    if (mine)    mine.style.display    = 'none';
+    if (waiting) waiting.style.display = 'block';
 }
 
 // Live polling, pick timer, and auto-pick
@@ -578,6 +590,7 @@ if (pauseBtn) {
             if (localPaused || localSeconds === null) return;
             localSeconds = Math.max(0, localSeconds - 1);
             renderTimer(localSeconds, localLimit, localPaused);
+            const sc = Math.ceil(localSeconds);
         }, 1000);
     }
 
@@ -593,20 +606,6 @@ if (pauseBtn) {
         const el = document.getElementById('clock-name');
         if (el && onTheClock) el.textContent = onTheClock;
         TEAMS.forEach(t => { t.is_on_clock = (onTheClock && t.username === onTheClock); });
-    }
-
-    function showMyTurnPanel() {
-        const mine    = document.getElementById('pick-panel-mine');
-        const waiting = document.getElementById('pick-panel-waiting');
-        if (mine)    mine.style.display    = 'block';
-        if (waiting) waiting.style.display = 'none';
-    }
-
-    function showWaitingPanel() {
-        const mine    = document.getElementById('pick-panel-mine');
-        const waiting = document.getElementById('pick-panel-waiting');
-        if (mine)    mine.style.display    = 'none';
-        if (waiting) waiting.style.display = 'block';
     }
 
     function updateClockBanner(data) {
@@ -636,7 +635,7 @@ if (pauseBtn) {
         const pickedIds = new Set(picks.map(p => String(p.player_id)));
         document.querySelectorAll('.pick-row, .avail-row').forEach(row => {
             if (pickedIds.has(String(row.dataset.playerId))) {
-                row.style.display = 'none';
+                row.classList.add('is-hidden');
                 row.dataset.picked = '1';
             }
         });
@@ -673,6 +672,7 @@ if (pauseBtn) {
                     wasMyTurn = true;
                     showMyTurnPanel();
                     updateClockBanner(data);
+                    if (typeof window.playDing === 'function') window.playDing();
                 }
 
                 // Turn lost (autopicked or pick confirmed) — swap to waiting panel
@@ -683,14 +683,24 @@ if (pauseBtn) {
                     updateClockBanner(data);
                 }
 
-                // Any pick: update team list + hide picked player from both panels
-                if (picksChanged && data.picks) {
-                    if (typeof window.playPickAlert === 'function') window.playPickAlert();
-                    updateTeamsFromPicks(data.picks);
+                // Always sync hidden state — covers stale renders and missed poll cycles
+                if (data.picks) {
                     hidePickedPlayers(data.picks);
+                }
+
+                // Any pick: update team list and banner
+                if (picksChanged && data.picks) {
+                    updateTeamsFromPicks(data.picks);
                     updateClockName(data.on_the_clock);
                     if (!turnChanged && !iLostMyTurn) {
                         updateClockBanner(data);
+                    }
+                    // If it's still/again our turn after a pick (e.g. single-member draft),
+                    // switch back to the pick panel — confirmBtn calls showWaitingPanel()
+                    // optimistically but the poll is the source of truth.
+                    if (data.my_turn) {
+                        wasMyTurn = true;
+                        showMyTurnPanel();
                     }
                     lastPicks = data.total_picks;
                     renderTeamList();
@@ -708,6 +718,7 @@ if (pauseBtn) {
     }
 
     setTimeout(poll, 2500);
+    window.draftPoll = poll;
 })();
 
 // Chat
@@ -759,7 +770,7 @@ if (pauseBtn) {
                         ? 'background:var(--green-dark);color:#fff;border-bottom-right-radius:.2rem;'
                         : 'background:#e9ecef;color:#212529;border-bottom-left-radius:.2rem;'
                 ].join('');
-                bubble.innerHTML = '<span style="font-weight:700;font-size:.7rem;display:block;margin-bottom:.1rem;opacity:.8;">' + esc(m.user__username) + '</span>' +
+                bubble.innerHTML = '<span style="font-weight:700;font-size:.7rem;display:block;margin-bottom:.1rem;opacity:.8;">' + esc(m.display_name || m.user__username) + '</span>' +
                     esc(m.text) +
                     '<span style="font-size:.6rem;opacity:.6;margin-left:.4rem;">' + fmtTime(m.created_at) + '</span>';
                 row.appendChild(bubble);
@@ -810,6 +821,7 @@ if (pauseBtn) {
                 if (data.ok) appendMessages([{
                     id: data.id,
                     user__username: data.username,
+                    display_name: data.display_name || data.username,
                     text: data.text,
                     created_at: data.created_at,
                 }]);
@@ -906,8 +918,28 @@ if (pauseBtn) {
         }, 1000);
     }
 
-    // Expose so the poll loop can call it
-    window.playPickAlert = playPickAlert;
+    function playTimerTick(secondsLeft) {
+        if (muted) return;
+        const ctx = getCtx();
+        ctx.resume();
+        const progress = Math.max(0, (10 - secondsLeft) / 10);
+        const freq = 300 + progress * 350;   // 300Hz → 650Hz as clock runs out
+        const vol  = 0.12 + progress * 0.3;
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(vol, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.12);
+    }
+
+    // Expose so the poll loop can call them
+    window.playDing       = playDing;
+    window.playTimerTick  = playTimerTick;
 })();
 </script>
 {% endblock %}

@@ -57,31 +57,32 @@
                data-last-updated="{{ last_updated|date:'c' }}">
             <thead>
                 <tr>
-                    <th class="pos-cell">Pos</th>
+                    {% if tournament.status != 'scheduled' %}<th class="pos-cell">Pos</th>{% endif %}
                     <th>Player</th>
-                    <th class="d-none d-md-table-cell">Country</th>
                     {% if tournament.status == 'in_progress' %}
                     <th class="text-center">Thru</th>
                     {% endif %}
                     {% for rn in round_numbers %}
-                    <th class="text-center {% if not forloop.last %}d-none d-md-table-cell{% endif %}">R{{ rn }}</th>
+                    <th class="text-center round-cell {% if not forloop.last %}d-none d-md-table-cell{% endif %}">R{{ rn }}</th>
                     {% endfor %}
-                    <th class="text-center">Total</th>
+                    {% if tournament.status != 'scheduled' %}<th class="text-center">Total</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
                 {% for entry, round_scores, thru in page.object_list %}
-                <tr data-player-id="{{ entry.player.espn_id }}">
+                <tr data-player-id="{{ entry.player.espn_id }}" data-name="{{ entry.player.display_name|lower }}">
+                    {% if tournament.status != 'scheduled' %}
                     <td class="pos-cell {% if entry.position == '1' %}pos-1{% elif entry.position == '2' %}pos-2{% elif entry.position == '3' %}pos-3{% endif %}"
                         data-field="position">
                         {{ entry.position|default:"—" }}
                     </td>
+                    {% endif %}
                     <td>
                         <a href="{% url 'golf:player_detail' entry.player.espn_id %}" class="player-link">
                             {{ entry.player.display_name }}
                         </a>
+                        {% if entry.player.country %}<span class="d-none d-md-inline text-muted ms-1" style="font-size:.75rem;">{{ entry.player.country }}</span>{% endif %}
                     </td>
-                    <td class="d-none d-md-table-cell text-muted small">{{ entry.player.country|default:"—" }}</td>
 
                     {% if tournament.status == 'in_progress' %}
                     <td class="text-center text-muted small" data-field="thru">
@@ -90,7 +91,7 @@
                     {% endif %}
 
                     {% for rn, score in round_scores %}
-                    <td class="text-center small {% if not forloop.last %}d-none d-md-table-cell{% endif %}"
+                    <td class="text-center small round-cell {% if not forloop.last %}d-none d-md-table-cell{% endif %}"
                         data-field="round-{{ rn }}">
                         {% if score %}
                             {% if score.strokes is None and score.tee_time %}
@@ -116,6 +117,7 @@
                     </td>
                     {% endfor %}
 
+                    {% if tournament.status != 'scheduled' %}
                     <td class="text-center total-cell" data-field="total">
                         {% if entry.total_score_to_par is None %}<span class="text-muted">—</span>
                         {% elif entry.total_score_to_par < 0 %}<span class="score-under">{{ entry.total_score_to_par }}</span>
@@ -123,6 +125,7 @@
                         {% else %}<span class="score-even">E</span>
                         {% endif %}
                     </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>

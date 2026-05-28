@@ -87,8 +87,19 @@ def league_detail(request, pk):
         order = list(draft.order.select_related('member__user', 'member__user__profile').order_by('position'))
         if not order:
             continue
-        has_scores = PlayerScore.objects.filter(tournament=draft.tournament).exists()
+        is_scheduled = draft.tournament.status == Tournament.Status.SCHEDULED
+        has_scores = (
+            not is_scheduled and
+            PlayerScore.objects.filter(tournament=draft.tournament, score_to_par__isnull=False).exists()
+        )
         lb_map = {e.player_id: e.total_score_to_par for e in Leaderboard.objects.filter(tournament=draft.tournament)} if has_scores else {}
+        # For scheduled tournaments, show R1 tee times per player
+        tee_map = {}
+        if is_scheduled:
+            for ps in PlayerScore.objects.filter(
+                tournament=draft.tournament, round__round_number=1, tee_time__isnull=False
+            ).select_related('round'):
+                tee_map[ps.player_id] = ps.tee_time
         all_picks = DraftPick.objects.filter(draft=draft).select_related('player').order_by('pick_number')
         by_member = {}
         for pick in all_picks:
@@ -107,7 +118,11 @@ def league_detail(request, pk):
                 stp = lb_map.get(pick.player_id)
                 if stp is not None:
                     team_score = (team_score or 0) + stp
-                pick_data.append({'player': pick.player, 'score_to_par': stp})
+                pick_data.append({
+                    'player': pick.player,
+                    'score_to_par': stp,
+                    'tee_time': tee_map.get(pick.player_id),
+                })
             teams.append({'member': member, 'picks': pick_data, 'team_score': team_score})
         draft_rosters[draft.pk] = teams
 
@@ -479,15 +494,12 @@ def set_draft_time(request, pk):
     if draft.league.commissioner != request.user:
         return redirect('fantasy:draft_room', pk=pk)
 
+    picks_started = draft.picks.exists()
     error = None
     if request.method == 'POST':
         from django.utils.dateparse import parse_datetime
         from django.utils import timezone as tz
         raw = request.POST.get('draft_time', '').strip()
-        try:
-            pick_time_limit = max(30, int(request.POST.get('pick_time_limit', 120)))
-        except ValueError:
-            pick_time_limit = 120
         dt = parse_datetime(raw) if raw else None
         if raw and not dt:
             error = 'Invalid date/time format.'
@@ -495,13 +507,24 @@ def set_draft_time(request, pk):
             if dt and tz.is_naive(dt):
                 dt = tz.make_aware(dt)
             draft.draft_time = dt
-            draft.pick_time_limit = pick_time_limit
-            draft.save(update_fields=['draft_time', 'pick_time_limit'])
+            update_fields = ['draft_time']
+            if not picks_started:
+                try:
+                    draft.pick_time_limit = max(30, int(request.POST.get('pick_time_limit', 120)))
+                except ValueError:
+                    pass
+                update_fields.append('pick_time_limit')
+            draft.save(update_fields=update_fields)
             return redirect('fantasy:draft_room', pk=pk)
 
     from django.utils import timezone as tz
     current = tz.localtime(draft.draft_time).strftime('%Y-%m-%dT%H:%M') if draft.draft_time else ''
-    return render(request, 'fantasy/set_draft_time.html', {'draft': draft, 'current': current, 'error': error})
+    return render(request, 'fantasy/set_draft_time.html', {
+        'draft':         draft,
+        'current':       current,
+        'error':         error,
+        'picks_started': picks_started,
+    })
 
 
 @login_required
@@ -556,6 +579,11 @@ def draft_state_api(request, pk):
     current_round = (total_p // member_count) + 1 if member_count and not draft_done else draft.league.roster_size
     pick_in_round = (total_p % member_count) + 1 if member_count and not draft_done else member_count
 
+    member_display = {
+        mem.user.username: mem.display()
+        for mem in draft.league.memberships.select_related('user', 'user__profile').all()
+    }
+
     since_id = int(request.GET.get('since', 0))
     messages = list(
         draft.messages.filter(id__gt=since_id)
@@ -563,6 +591,7 @@ def draft_state_api(request, pk):
     )
     for m in messages:
         m['created_at'] = m['created_at'].isoformat()
+        m['display_name'] = member_display.get(m['user__username'], m['user__username'])
 
     return JsonResponse({
         'status':                 draft.status,
@@ -590,10 +619,18 @@ def send_message(request, pk):
     if not text:
         return JsonResponse({'error': 'Empty message.'}, status=400)
     msg = DraftMessage.objects.create(draft=draft, user=request.user, text=text)
+    try:
+        sender_member = LeagueMember.objects.select_related('user__profile').get(
+            league=draft.league, user=request.user
+        )
+        display_name = sender_member.display()
+    except LeagueMember.DoesNotExist:
+        display_name = request.user.username
     return JsonResponse({
         'ok': True,
         'id': msg.pk,
         'username': request.user.username,
+        'display_name': display_name,
         'text': msg.text,
         'created_at': msg.created_at.isoformat(),
     })
@@ -710,8 +747,8 @@ def draft_standings(request, pk):
             'status':       ps.status,
         }
 
-    # Determine how many rounds the tournament has
-    max_rounds = max((rn for _, rn in round_map), default=4) if round_map else 4
+    # Always show 4 rounds; expand if data has more (e.g. a 5-round event)
+    max_rounds = max(max((rn for _, rn in round_map), default=0), 4)
     round_numbers = list(range(1, max_rounds + 1))
 
     # Pre-fetch ALL picks for this draft in one query, grouped by member_id
@@ -747,7 +784,7 @@ def draft_standings(request, pk):
                     st    = ps_data['status']
                     if stp is not None:
                         round_scores.append({'type': 'score', 'value': stp, 'thru': thru})
-                    elif ttime and st == 'scheduled':
+                    elif ttime:
                         round_scores.append({'type': 'tee_time', 'value': ttime})
                     else:
                         round_scores.append({'type': 'pending'})
@@ -756,7 +793,11 @@ def draft_standings(request, pk):
                 else:
                     round_scores.append({'type': 'pending'})
 
-            score_to_par = entry.total_score_to_par if entry and entry.total_score_to_par is not None else None
+            is_scheduled = draft.tournament.status == Tournament.Status.SCHEDULED
+            score_to_par = (
+                None if is_scheduled
+                else (entry.total_score_to_par if entry and entry.total_score_to_par is not None else None)
+            )
             if score_to_par is not None:
                 team_score = (team_score or 0) + score_to_par
 

@@ -74,7 +74,7 @@
                     </td>
                     {% endfor %}
                     <td class="text-center small">
-                        {% if p.entry and p.entry.total_score_to_par is not None %}
+                        {% if draft.tournament.status != 'scheduled' and p.entry and p.entry.total_score_to_par is not None %}
                             {% if p.entry.total_score_to_par < 0 %}<span class="score-under">{{ p.entry.total_score_to_par }}</span>
                             {% elif p.entry.total_score_to_par > 0 %}<span class="score-over">+{{ p.entry.total_score_to_par }}</span>
                             {% else %}<span class="score-even">E</span>{% endif %}

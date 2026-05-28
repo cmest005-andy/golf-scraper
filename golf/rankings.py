@@ -33,6 +33,10 @@ _NAME_MAP = {
     'Fabian Gomez':       'Fabián Gómez',
     'Kyoung-Hoon Lee':    'K.H. Lee',
     'Chun-an Yu':         'Kevin Yu',
+    'Ludvig Aberg':             'Ludvig Åberg',
+    'Nicolas Echavarria':       'Nico Echavarria',
+    'Samuel Stevens':           'Sam Stevens',
+    'Rasmus Neergaard':         'Rasmus Neergaard-Petersen',
 }
 
 

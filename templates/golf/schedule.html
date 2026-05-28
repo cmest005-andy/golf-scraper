@@ -61,4 +61,42 @@
         </table>
     </div>
 </div>
+
+{% if completed_results %}
+<h2 class="mb-2 mt-4" style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:700;color:var(--green-mid);letter-spacing:.05em;text-transform:uppercase;">Past Results</h2>
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table mb-0" style="font-size:.9rem;">
+            <thead>
+                <tr style="background:var(--green-dark);">
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Tournament</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell">Dates</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;" class="d-none d-md-table-cell">Course</th>
+                    <th style="color:var(--gold-light);font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;border:none;padding:.6rem .75rem;">Winner</th>
+                    <th style="border:none;padding:.6rem .75rem;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t, winner in completed_results %}
+                <tr style="border-bottom:1px solid #EAEAE4;">
+                    <td style="padding:.55rem .75rem;font-weight:600;white-space:nowrap;">{{ t.name }}</td>
+                    <td style="padding:.55rem .75rem;white-space:nowrap;" class="d-none d-md-table-cell text-muted">{{ t.start_date|date:"M j" }} – {{ t.end_date|date:"M j" }}</td>
+                    <td style="padding:.55rem .75rem;" class="d-none d-md-table-cell text-muted">{% if t.course %}<a href="{% url 'golf:course_detail' t.course.pk %}" class="player-link">{{ t.course.name }}</a>{% else %}—{% endif %}</td>
+                    <td style="padding:.55rem .75rem;">
+                        {% if winner %}
+                        <a href="{% url 'golf:player_detail' winner.espn_id %}" class="player-link fw-semibold">{{ winner.display_name }}</a>
+                        {% else %}
+                        <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:.55rem .75rem;">
+                        <a href="{% url 'golf:index' %}?tournament={{ t.pk }}" class="btn btn-sm btn-outline-secondary" style="font-size:.75rem;">Results</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

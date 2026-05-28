@@ -288,19 +288,45 @@ def course_detail(request, pk):
 def schedule(request):
     from django.utils import timezone
     today = timezone.now().date()
+
+    current_season = (
+        Tournament.objects
+        .filter(status=Tournament.Status.IN_PROGRESS)
+        .values_list('season', flat=True)
+        .first()
+    ) or (
+        Tournament.objects
+        .aggregate(max_season=Max('season'))['max_season']
+    )
+
     upcoming = (
         Tournament.objects
-        .filter(start_date__gte=today, status=Tournament.Status.SCHEDULED)
+        .filter(start_date__gte=today, status=Tournament.Status.SCHEDULED, season=current_season)
         .order_by('start_date')
     )
     in_progress = (
         Tournament.objects
-        .filter(status=Tournament.Status.IN_PROGRESS)
+        .filter(status=Tournament.Status.IN_PROGRESS, season=current_season)
         .order_by('start_date')
     )
+    completed = (
+        Tournament.objects
+        .filter(status=Tournament.Status.COMPLETED, season=current_season)
+        .order_by('-start_date')
+    )
+
+    winner_map = {
+        e.tournament_id: e.player
+        for e in Leaderboard.objects
+            .filter(tournament__in=completed, position='1')
+            .select_related('player')
+    }
+    completed_results = [(t, winner_map.get(t.pk)) for t in completed]
+
     return render(request, 'golf/schedule.html', {
         'in_progress': in_progress,
         'upcoming': upcoming,
+        'completed_results': completed_results,
     })
 
 

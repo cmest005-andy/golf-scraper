@@ -18,7 +18,7 @@ class Command(BaseCommand):
         self.stdout.write("Fetching PGA Tour news from ESPN API...")
 
         try:
-            response = requests.get(ESPN_URL, timeout=15)
+            response = requests.get(ESPN_URL, timeout=(5, 15))
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as exc:

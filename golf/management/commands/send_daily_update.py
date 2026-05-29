@@ -72,7 +72,7 @@ def _build_commentary(standings, tournament_name, round_label, is_final):
     )
 
     try:
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=30.0)
         message = client.messages.create(
             model='claude-haiku-4-5-20251001',
             max_tokens=400,

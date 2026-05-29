@@ -231,15 +231,18 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING("  [dry-run] Not sending."))
                 continue
 
-            msg = EmailMultiAlternatives(
-                subject=subject,
-                body=self._plain_text(standings, commentary, tournament.name, round_label),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=recipients,
-            )
-            msg.attach_alternative(html_body, 'text/html')
-            msg.send()
-            self.stdout.write(self.style.SUCCESS(f"  Sent to {len(recipients)} recipient(s)."))
+            try:
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=self._plain_text(standings, commentary, tournament.name, round_label),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=recipients,
+                )
+                msg.attach_alternative(html_body, 'text/html')
+                msg.send()
+                self.stdout.write(self.style.SUCCESS(f"  Sent to {len(recipients)} recipient(s)."))
+            except Exception as exc:
+                self.stderr.write(self.style.ERROR(f"  Failed to send: {exc}"))
 
     def _send_test(self, email, app_name):
         standings = [
